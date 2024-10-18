@@ -47,7 +47,7 @@ void printS(){
 
 
     printf("Login\tName\tTty\tIdle\tLogin time\tOffice\t Office phone\n");
-    printf("\n");
+
  
 }
 
@@ -79,6 +79,7 @@ void printUtmpBase(){
     {
         if (current_record.ut_type == USER_PROCESS)
         {
+            printf("****STAMPA DA UTMP****\n");            
             printf("Utente: %s\n", current_record.ut_user);
             printf("Linea di terminale: %s\n", current_record.ut_line);
             printf("Host remoto: %s\n", current_record.ut_host);
@@ -106,6 +107,7 @@ void printPwdBase(){
 
     if (pw)
     {
+        
         printf("Nome utente: %s\n", pw->pw_name);
         printf("Directory home: %s\n", pw->pw_dir);
         printf("Shell: %s\n", pw->pw_shell);
@@ -134,6 +136,7 @@ void printPwdV2(){
 
     if (pw)
     {
+        printf("****STAMPA DA PWD****\n");
         printf("nome: %s\n",pw->pw_name);
         printf("password: %s\n",pw->pw_passwd);
         printf("Nome reale: %s\n",pw->pw_gecos);
@@ -144,4 +147,17 @@ void printPwdV2(){
         perror("Errore nel recuperare le info dell'utente");
 
     }
+}
+
+
+void getAllUid(){
+        struct passwd *pw;
+
+    // Usa getpwent() per ottenere ogni entry del file /etc/passwd
+    while ((pw = getpwent()) != NULL) {
+        printf("Utente: %s, UID: %u\n", pw->pw_name, pw->pw_uid);
+    }
+
+    // Chiudi l'accesso al database degli utenti
+    endpwent();
 }
