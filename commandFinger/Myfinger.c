@@ -14,34 +14,35 @@ int main(int argc, char  *argv[])
     char *option;
     int total_lenght = 9 ;
 
-    // for (int i = 1; i < argc; i++)
-    // {
-    //     total_lenght += strlen(argv[i]);
-    // }
-    
-    // 
     option = (char *)malloc(total_lenght+1);
     
     //inizizlizzo la stringa vuota
     option[0] = '\0';
 
-    //se ci sono specifiche 
+    //se nella riga di comando ho messo delle opzioni oppure ho cercato un utente specifico
     if (argc > 1)
     {
         for (int i = 1; i < argc; i++)
         {
             if (strncmp(argv[i], "-", 1) == 0)
             {
-                strcat(option,argv[i]);
+                char *subStr = argv[i] + 1;  // Puntiamo al secondo carattere dell'array
+                strcat(option,subStr);
             }
-            
         }
-
+        optionSelection(option);
     }
-
+    else
+    {
+        printS();
+    }
+    
+    
     free(option);
     
 
+    return 0;
+    }
 
 
 
@@ -52,9 +53,3 @@ int main(int argc, char  *argv[])
     // printPwdBase();
     // printPwdV2();
     // getAllUid();
-
-    return 0;
-    }
-
-
-

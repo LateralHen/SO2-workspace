@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <utmp.h>
 #include <pwd.h>
+#include <time.h>
+#include <stdbool.h>
 
 
 
@@ -20,39 +22,136 @@ void printString (char *string){
 }
 
 
-void optionSelection(char *string){
-    char *opt1 = string;
-    int opt1Sel;
-
-    if (strcmp(opt1,"-s") == 0)
-    {
-        opt1Sel = 1;
-        printString("prima opzione selezionata");
-    }
-    else if (strcmp(opt1,"-l") == 0)
-    {
-        opt1Sel = 2;
-        printString("seconda opzione selezionata");
-    }
-    else
-    {
-        printString("nessuna opzione selezionata");
-    }
-    
-}
 
 
 
 void printS(){
 
+    struct passwd *pwd;
+    struct utmp *ut;
+    int utmp_file;
+    int pwd_file;
 
+    printf("***PRINT SMALL***\n");
+    printf("Login\tName\tTty\tIdle\tLogin time\tOffice\t Office phone\n");
+    setutent();
+    while ((ut= getutent()) != NULL )
+    {
+        if (ut->ut_type == USER_PROCESS)
+        {
+            pwd = getpwnam(ut ->ut_user);
+            if (pwd == NULL)
+            {
+                printf("Informazioni su %s non trovate in passwd", ut->ut_user);
+            }
+            //username
+            printf("%s\t", ut -> ut_user );
+            
+            //Real Name
+            printf("%s\t", pwd->pw_gecos);
+
+            // Terminal
+            printf("%s\t", ut ->ut_line);
+
+            // Idle Time
+            printf(" \t");
+
+            // Login time
+
+            // recupero i secondi passati dal login 
+            time_t login_time_sec = ut -> ut_tv.tv_sec;
+            // trasformo i secondi in struct tm, mi servirà per 
+            struct tm *login_time_tm = localtime(&login_time_sec);
+            char login_time_format[80];
+
+             strftime(login_time_format,sizeof(login_time_format), "%B-%d %H:%M", login_time_tm);
+
+            printf("%s\t",login_time_format);
+
+            // Office
+            printf("\t");
+
+            // Office phone
+            printf("\n");
+
+
+        }
+        
+    }
+    endutent();
+
+
+
+
+
+
+
+/*     
+    // leggo il file utmp dove ci sono le info di tutti gli utenti
+    utmp_file = open(_PATH_UTMP,O_RDONLY);
+
+    //nel caso l'apertura desse errore
+    if (utmp_file == -1)
+    {
+        perror("errore nella lettura del file utmp");
+    }
+
+    // stampo l'intestazione della tabella
     printf("Login\tName\tTty\tIdle\tLogin time\tOffice\t Office phone\n");
 
- 
+    //leggo tutti gli utenti nel file usando un while loop
+    while (read(utmp_file,&current_record, sizeof(current_record)) == sizeof(current_record))
+    {
+        
+        if (current_record.ut_type == USER_PROCESS)
+        {
+            //prendo le info dell'utente preso in considerazione
+            pwd = getpwnam(current_record.ut_user);
+            
+            
+            
+            //username
+            printf("%s\t", current_record.ut_pid );
+            
+            //Real Name
+            printf("%s\t", pwd->pw_gecos);
+
+            // Terminal
+            printf("\t", current_record.ut_line);
+
+            // Idle Time
+            printf("\t");
+
+            // Login time
+
+            // recupero i secondi passati dal login 
+            time_t login_time_sec = current_record.ut_tv.tv_sec;
+            // trasformo i secondi in struct tm, mi servirà per 
+            struct tm *login_time_tm = localtime(&login_time_sec);
+            char login_time_format[80];
+
+             strftime(login_time_format,sizeof(login_time_format), "%B-%d %H:%M", login_time_tm);
+
+            printf("%s\t",login_time_format);
+
+            // Office
+            printf("\t");
+
+            // Office phone
+            printf("\n");
+            
+            
+            
+            
+        }
+        
+    } */
+    
 }
 
 void printL(){
 
+    printf("***PRINT LARGE***\n");
     printf("Login:[]\t\tName:[]\n");
     printf("Directory:[]\t\tShell:[]\n");
     printf("Login time:[]\n");
@@ -62,102 +161,68 @@ void printL(){
     
 }
 
-void printUtmpBase(){
-    struct utmp current_record;
-    int utmp_file;
-
-    // apriamo il file utmp
-    utmp_file = open(_PATH_UTMP,O_RDONLY);
-
-    if (utmp_file == -1)
-    {
-        perror("errore nella lettura del file utmp");
-    }
+void optionSelection(char *options){
     
-    //leggiamo ogni record nel file utmp
-    while (read(utmp_file,&current_record, sizeof(current_record)) == sizeof(current_record))
+    bool optL = false;
+    bool optS = false;
+    bool optM = false;
+    bool optP = false;
+    int valida = 1; //flag per il corretto inserimento delle opzioni
+
+
+    // visualizza sul terminale che opzioni ho scritto sul terminale
+    printString(options);
+
+
+    for (int i = 0; options[i] != '\0'; i++)
     {
-        if (current_record.ut_type == USER_PROCESS)
+        switch (options[i])
         {
-            printf("****STAMPA DA UTMP****\n");            
-            printf("Utente: %s\n", current_record.ut_user);
-            printf("Linea di terminale: %s\n", current_record.ut_line);
-            printf("Host remoto: %s\n", current_record.ut_host);
-            printf("\n");
+        case 'l':
+            optL = true;
+            break;
+
+        case 's':
+            optS = true;    
+            break;
+        
+        case 'm':
+            optM = true;
+            break;
+
+        case 'p':
+            optP = true;
+            break;
+        
+        default:
+            // carattere non valido trovato
+            valida = 0;
+            break;
+        }
+
+        if (!valida)
+        {
+            break; // uscita dal ciclo
+        }
+    }
+
+    if (valida)
+    {
+        printf("le opzioni sono corrette\n");
+        if (optL)
+        {
+            printL();
+        }else
+        {
+            printS();
         }
         
-    }
-    close(utmp_file);
-    
-}
-
-void printPwdBase(){
-
-    /* La libreria pwd.h fornisce un'interfaccia per accedere alle informazioni sugli
-     utenti, come definite nel file /etc/passwd. */
-
-    struct passwd *pw;
-    uid_t uid;
-
-    //ottieni l'UID dell'utente corrente
-    uid = geteuid();
-
-    //ottieni le informazioni dell'utente in base all'UID
-    pw = getpwuid(uid);
-
-    if (pw)
-    {
         
-        printf("Nome utente: %s\n", pw->pw_name);
-        printf("Directory home: %s\n", pw->pw_dir);
-        printf("Shell: %s\n", pw->pw_shell);
-    } else {
-        perror("Errore nel recuperare le info dell'utente");
+    }else
+    {
+        printf("opzioni errate, riprovare");
     }
     
+    
 
-    /* 
-    FUNZIONI UTILI:
-        getpwuid(): Restituisce una struttura passwd basata su un UID.
-        getpwnam(): Restituisce una struttura passwd basata su un nome utente.  
-    */
-}
-
-void printPwdV2(){
-
-    struct passwd *pw;
-    uid_t uid;
-
-    //ottieni l'UID dell'utente corrente
-    uid = geteuid();
-
-    //ottieni le informazioni dell'utente in base all'UID
-    pw = getpwuid(uid);
-
-    if (pw)
-    {
-        printf("****STAMPA DA PWD****\n");
-        printf("nome: %s\n",pw->pw_name);
-        printf("password: %s\n",pw->pw_passwd);
-        printf("Nome reale: %s\n",pw->pw_gecos);
-        printf("directory: %s\n",pw->pw_dir);
-        printf("shell utilizzata: %s\n",pw->pw_shell);
-        
-    } else {
-        perror("Errore nel recuperare le info dell'utente");
-
-    }
-}
-
-
-void getAllUid(){
-        struct passwd *pw;
-
-    // Usa getpwent() per ottenere ogni entry del file /etc/passwd
-    while ((pw = getpwent()) != NULL) {
-        printf("Utente: %s, UID: %u\n", pw->pw_name, pw->pw_uid);
-    }
-
-    // Chiudi l'accesso al database degli utenti
-    endpwent();
 }
