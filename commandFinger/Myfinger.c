@@ -11,11 +11,11 @@
 
 int main(int argc, char  *argv[])
 {
-    char *option;
+    char option[argc];
+    char *names[argc];
+    int totalNames = 0;
     int total_lenght = 9 ;
 
-    option = (char *)malloc(total_lenght+1);
-    
     //inizizlizzo la stringa vuota
     option[0] = '\0';
 
@@ -29,16 +29,28 @@ int main(int argc, char  *argv[])
                 char *subStr = argv[i] + 1;  // Puntiamo al secondo carattere dell'array
                 strcat(option,subStr);
             }
+            else
+            {
+                names[totalNames] = argv[i];
+                totalNames ++ ; 
+            }
+            
         }
         optionSelection(option);
+        for (int i = 0; i < totalNames; i++)
+        {
+            printString(names[i]);
+        }
+        
     }
     else
     {
+        printf("Nessuna opzione\n");
         printS();
     }
     
     
-    free(option);
+    // free(option);
     
 
     return 0;
@@ -53,3 +65,7 @@ int main(int argc, char  *argv[])
     // printPwdBase();
     // printPwdV2();
     // getAllUid();
+
+
+
+    

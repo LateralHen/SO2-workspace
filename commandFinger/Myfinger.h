@@ -45,7 +45,7 @@ void printS(){
                 printf("Informazioni su %s non trovate in passwd", ut->ut_user);
             }
             //username
-            printf("%s\t", ut -> ut_user );
+            printf("%s \t", ut -> ut_user );
             
             //Real Name
             printf("%s\t", pwd->pw_gecos);
@@ -62,11 +62,18 @@ void printS(){
             time_t login_time_sec = ut -> ut_tv.tv_sec;
             // trasformo i secondi in struct tm, mi servirà per 
             struct tm *login_time_tm = localtime(&login_time_sec);
+            time_t t = time(NULL);
             char login_time_format[80];
-
-             strftime(login_time_format,sizeof(login_time_format), "%B-%d %H:%M", login_time_tm);
-
-            printf("%s\t",login_time_format);
+            if ( (t - login_time_sec) < 15552000 )
+            {   
+                strftime(login_time_format,sizeof(login_time_format), "%b %d %H:%M", login_time_tm);
+            }
+            else
+            {
+                strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
+            }
+            
+            printf("%s (%s)\t",login_time_format, ut -> ut_host);
 
             // Office
             printf("\t");
@@ -81,84 +88,78 @@ void printS(){
     endutent();
 
 
-
-
-
-
-
-/*     
-    // leggo il file utmp dove ci sono le info di tutti gli utenti
-    utmp_file = open(_PATH_UTMP,O_RDONLY);
-
-    //nel caso l'apertura desse errore
-    if (utmp_file == -1)
-    {
-        perror("errore nella lettura del file utmp");
-    }
-
-    // stampo l'intestazione della tabella
-    printf("Login\tName\tTty\tIdle\tLogin time\tOffice\t Office phone\n");
-
-    //leggo tutti gli utenti nel file usando un while loop
-    while (read(utmp_file,&current_record, sizeof(current_record)) == sizeof(current_record))
-    {
-        
-        if (current_record.ut_type == USER_PROCESS)
-        {
-            //prendo le info dell'utente preso in considerazione
-            pwd = getpwnam(current_record.ut_user);
-            
-            
-            
-            //username
-            printf("%s\t", current_record.ut_pid );
-            
-            //Real Name
-            printf("%s\t", pwd->pw_gecos);
-
-            // Terminal
-            printf("\t", current_record.ut_line);
-
-            // Idle Time
-            printf("\t");
-
-            // Login time
-
-            // recupero i secondi passati dal login 
-            time_t login_time_sec = current_record.ut_tv.tv_sec;
-            // trasformo i secondi in struct tm, mi servirà per 
-            struct tm *login_time_tm = localtime(&login_time_sec);
-            char login_time_format[80];
-
-             strftime(login_time_format,sizeof(login_time_format), "%B-%d %H:%M", login_time_tm);
-
-            printf("%s\t",login_time_format);
-
-            // Office
-            printf("\t");
-
-            // Office phone
-            printf("\n");
-            
-            
-            
-            
-        }
-        
-    } */
-    
 }
 
 void printL(){
 
-    printf("***PRINT LARGE***\n");
+    struct passwd *pwd;
+    struct utmp *ut;
+    int utmp_file;
+    int pwd_file;
+
+
+/*     printf("***PRINT LARGE***\n");
     printf("Login:[]\t\tName:[]\n");
     printf("Directory:[]\t\tShell:[]\n");
     printf("Login time:[]\n");
     printf("Mail:[]\n");
     printf("plan:[]\n");
-    printf("\n");
-    
+    printf("\n"); */
+
+    while ((ut = getutent()) != NULL)
+    {
+        if (ut->ut_type == USER_PROCESS)
+        {
+            pwd = getpwnam(ut ->ut_user);
+            if (pwd != NULL)
+            {
+                // Login
+                printf("Login: %s \t\t", ut -> ut_name);
+
+                // Name
+                printf("Name: %s\n", pwd -> pw_gecos);
+
+                // Directory
+                printf("Directory: %s\t" , pwd -> pw_dir);
+                
+                // Shell
+                printf("Shell: %s\n" , pwd -> pw_shell);
+
+                // Login time
+                // recupero i secondi passati dal login 
+                time_t login_time_sec = ut -> ut_tv.tv_sec;
+                // trasformo i secondi in struct tm, mi servirà per 
+                struct tm *login_time_tm = localtime(&login_time_sec);
+                time_t t = time(NULL);
+                char login_time_format[80];
+                if ( (t - login_time_sec) < 15552000 )
+                {   
+                    strftime(login_time_format,sizeof(login_time_format), "%a %b %d %H:%M", login_time_tm);
+                }
+                else
+                {
+                    strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
+                }
+                printf("On since %s (CET) on %s\n", login_time_format, ut -> ut_host);
+                
+                
+                
+                // Mail
+                printf("Mail:[]\n");
+                // plan
+                printf("plan:[]\n");
+                printf("\n");
+            }
+            else
+            {
+               printf("Informazioni su %s non trovate in passwd", ut->ut_user);
+            }
+            
+            
+        }
+        
+    }
+
 }
 
 void optionSelection(char *options){
