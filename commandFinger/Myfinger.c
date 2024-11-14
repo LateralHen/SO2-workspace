@@ -5,14 +5,10 @@
 #include <fcntl.h>
 #include "Myfinger.h"
 
-
-
-
-
 int main(int argc, char  *argv[])
 {
     char option[argc];
-    char *names[argc];
+    char **names = NULL;
     int totalNames = 0;
     int total_lenght = 9 ;
 
@@ -31,22 +27,22 @@ int main(int argc, char  *argv[])
             }
             else
             {
+                // Allocazione della memoria per il nome
+                names = (char **)realloc(names, (totalNames + 1) * sizeof(char *));
                 names[totalNames] = argv[i];
                 totalNames ++ ; 
             }
             
         }
-        optionSelection(option);
-        for (int i = 0; i < totalNames; i++)
-        {
-            printString(names[i]);
-        }
+        // optionSelection(option);
+        userSelection(names, &totalNames);
         
     }
     else
     {
-        printf("Nessuna opzione\n");
-        printS();
+        userSelection(names, &totalNames);
+        //printL(names,totalNames);
+        //printS();
     }
     
     
@@ -55,8 +51,6 @@ int main(int argc, char  *argv[])
 
     return 0;
     }
-
-
 
 void printS(){
 
@@ -124,13 +118,59 @@ void printS(){
 }
 
 
-void printL(){
+void printL(char **nameUser, int totalNames){
 
     struct passwd *pwd;
     struct utmp *ut;
-    int utmp_file;
-    int pwd_file;
+    
 
+    /* 
+    prendo i nomi da nameUser
+    ciclo su pwd i nomi presi:
+        stampo le info prese da pwd del singolo utente
+        ciclo su utmp:
+            stampo le info prese da utmp per tutti gli utenti con quel nome
+
+    */
+
+    for (int i = 0; i < totalNames ; i++)
+    {
+        printf("%s\n",nameUser[i]);
+        pwd = getpwnam(nameUser[i]);
+        if (pwd != NULL)
+        {
+            // Login
+            printf("Login: %s \t\t", pwd -> pw_name);
+
+            // Name
+            printf("Name: %s\n", pwd -> pw_gecos);
+
+            // Directory
+            printf("Directory: %s\t" , pwd -> pw_dir);
+            
+            // Shell
+            printf("Shell: %s\n" , pwd -> pw_shell);
+
+            // Login time
+            // recupero i secondi passati dal login 
+            time_t login_time_sec = ut -> ut_tv.tv_sec;
+            // trasformo i secondi in struct tm, mi servirà per 
+            struct tm *login_time_tm = localtime(&login_time_sec);
+            time_t t = time(NULL);
+            char login_time_format[80];
+            if ( (t - login_time_sec) < 15552000 )
+            {   
+                strftime(login_time_format,sizeof(login_time_format), "%a %b %d %H:%M", login_time_tm);
+            }
+            else
+            {
+                strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
+            }
+            printf("On since %s (CET) on %s\n", login_time_format, ut -> ut_host);
+        }
+        
+    }
+    
 
     /*
     printf("***PRINT LARGE***\n");
@@ -142,7 +182,9 @@ void printL(){
     printf("\n");
     */
 
-    while ((ut = getutent()) != NULL)
+
+
+    /* while ((ut = getutent()) != NULL)
     {
         if (ut->ut_type == USER_PROCESS)
         {
@@ -194,7 +236,7 @@ void printL(){
             
         }
         
-    }
+    } */
 
 
 }
@@ -202,12 +244,7 @@ void printL(){
 
 void optionSelection(char *options){
         
-    bool optL = false;
-    bool optS = false;
-    bool optM = false;
-    bool optP = false;
     int valida = 1; //flag per il corretto inserimento delle opzioni
-
 
     // visualizza sul terminale che opzioni ho scritto sul terminale
     printString(options);
@@ -250,7 +287,8 @@ void optionSelection(char *options){
         printf("le opzioni sono corrette\n");
         if (optL)
         {
-            printL();
+            
+            //printL();
         }else
         {
             printS();
@@ -266,6 +304,157 @@ void optionSelection(char *options){
 
 }
 
-
-
+/*
+void userSelection (char **names, int totalnames){
     
+    struct utmp *ut;
+    int i = 0;
+    
+    setutent();
+    //se non sono stati specificati dei nomi utente
+    if (*names == NULL)
+    {
+        // Inizializza un array dinamico per i nomi degli utenti
+        *names = (char **)malloc(100 * sizeof(char *)); // Allocazione per 100 utenti
+        if (*names == NULL) {
+            perror("Memory allocation failed");
+            return;
+        }
+        
+        while ((ut= getutent()) != NULL )
+        {
+            if (ut->ut_type == USER_PROCESS)
+            {
+                char utente[32];
+                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
+                utente[sizeof(utente) - 1] = '\0';
+                // Alloca memoria per ogni nome e lo copia nell'array names
+                names[i] = strdup(utente);
+                i++;
+            }
+        }
+
+        *totalnames = i;
+
+        for (int i = 0; i < totalnames; i++)
+        {
+            printf("%s\n", names[i]);
+        }
+        
+        
+    } 
+    //  Nel caso in cui siano stati specificati dei nomi
+    else
+    {
+        while ((ut= getutent()) != NULL )
+        {
+            if (ut->ut_type == USER_PROCESS)
+            {
+                char utente[32];
+                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
+                utente[sizeof(utente) - 1] = '\0';
+                
+                // verifico se il nome utente preso è dentro l'array names iterando 
+                for (int j = 0; j < *totalnames; j++)
+                {
+                    if (strcmp(*names[j], utente) == 0)
+                    {
+                        printf("utente trovato\n");
+                    }
+                    
+                }
+                
+            }
+        }
+    }
+    
+    endutent();
+}
+*/
+
+void userSelection(char **names, int *totalnames) {
+    
+    struct utmp *ut;
+    int i = 0;
+    
+    setutent();
+
+    // Se non sono stati specificati dei nomi utente
+    if (names == NULL) {
+
+        // Inizializza un array dinamico per i nomi degli utenti
+        names = (char **)malloc(100 * sizeof(char *)); // Allocazione per 100 utenti
+        if (names == NULL) {
+            perror("Memory allocation failed");
+            return;
+        }
+
+
+        while ((ut = getutent()) != NULL) {
+            int valida = 0; // flag per il controllo dei duplicati
+            if (ut->ut_type == USER_PROCESS) {
+                char utente[32];
+                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
+                utente[sizeof(utente) - 1] = '\0';
+
+                for (int j = 0; j < i; i++)
+                {
+                    if (strcmp(utente,names[j]) == 0)
+                    {
+                        valida = 1; // duplicato trovato
+                        break;
+                    }
+                    
+                }
+                
+                if (valida)
+                {
+                    continue;
+                }
+                
+                // Alloca memoria per il nome dell'utente e lo copia nell'array names
+                names[i] = strdup(utente);
+                
+                if (names[i] == NULL) {
+                    perror("Memory allocation failed for username");
+                    break;
+                } 
+                
+                i++;
+            }
+        }
+        
+
+        *totalnames = i;
+
+         // Stampa i nomi degli utenti trovati
+        for (int j = 0; j < *totalnames; j++) {
+            printf("%s\n", names[j]);
+        } 
+        
+    } 
+    // Nel caso in cui siano stati specificati dei nomi
+    else {
+        while ((ut = getutent()) != NULL) {
+            if (ut->ut_type == USER_PROCESS) {
+                char utente[32];
+                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
+                utente[sizeof(utente) - 1] = '\0';
+
+                // Verifica se il nome utente è presente nell'array names
+                for (int j = 0; j < *totalnames; j++) {
+                    if (strcmp(names[j], utente) == 0) {
+                        printf("Utente trovato: %s\n", utente);
+                    }
+                }
+            }
+        }
+    }
+
+    endutent();
+}
+
+
+void geocos_format(char *gecos){
+    str
+}
