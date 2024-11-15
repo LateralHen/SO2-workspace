@@ -10,7 +10,6 @@ int main(int argc, char  *argv[])
     char option[argc];
     char **names = NULL;
     int totalNames = 0;
-    int total_lenght = 9 ;
 
     //inizizlizzo la stringa vuota
     option[0] = '\0';
@@ -22,7 +21,7 @@ int main(int argc, char  *argv[])
         {
             if (strncmp(argv[i], "-", 1) == 0)
             {
-                char *subStr = argv[i] + 1;  // Puntiamo al secondo carattere dell'array
+                char *subStr = argv[i] + 1;  // Puntiamo al secondo carattere dell'array per togliere il - che è davanti a tutte le opzioni
                 strcat(option,subStr);
             }
             else
@@ -34,15 +33,17 @@ int main(int argc, char  *argv[])
             }
             
         }
-        // optionSelection(option);
-        userSelection(names, &totalNames);
+        userSelection(&names, &totalNames);
+        optionSelection(option, names, totalNames);
         
     }
+    // quando non viene specificato nessun nome o opzione
     else
     {
-        userSelection(names, &totalNames);
-        //printL(names,totalNames);
-        //printS();
+        userSelection(&names, &totalNames);
+        printS(names, totalNames);
+               
+
     }
     
     
@@ -52,77 +53,87 @@ int main(int argc, char  *argv[])
     return 0;
     }
 
-void printS(){
+void printS(char **nameUser, int totalNames){
 
     struct passwd *pwd;
     struct utmp *ut;
-    int utmp_file;
-    int pwd_file;
+
 
     printf("***PRINT SMALL***\n");
     printf("Login\tName\tTty\tIdle\tLogin time\tOffice\t Office phone\n");
-    setutent();
-    while ((ut= getutent()) != NULL )
+
+    for (int i = 0; i < totalNames; i++)
     {
-        if (ut->ut_type == USER_PROCESS)
+        setutent();
+        while ((ut= getutent()) != NULL )
         {
-            pwd = getpwnam(ut ->ut_user);
-            if (pwd == NULL)
+            if (ut->ut_type == USER_PROCESS)
             {
-                printf("Informazioni su %s non trovate in passwd", ut->ut_user);
+                //printf("ut:%s \t name:%s\n",ut -> ut_user, nameUser[i]);
+                char utente[32];
+                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
+                utente[sizeof(utente) - 1] = '\0';
+
+                if (strcmp(utente,nameUser[i])==0)
+                {
+                    pwd = getpwnam(ut ->ut_user);
+                    if (pwd == NULL)
+                    {
+                        printf("Informazioni su %s non trovate in passwd", ut->ut_user);
+                    }
+                    //username
+                    printf("%s \t", ut -> ut_user );
+                    
+                    //Real Name
+
+                    char **words = NULL;
+                    words = (char **)malloc(10 * sizeof(char *));
+                    gecos_format(pwd->pw_gecos, words);
+
+                    printf("%s\t", words[0]);
+
+                    // Terminal
+                    printf("%s\t", ut ->ut_line);
+
+                    // Idle Time
+                    printf(" \t");
+
+                    // Login time
+
+                    // recupero i secondi passati dal login 
+                    time_t login_time_sec = ut -> ut_tv.tv_sec;
+                    // trasformo i secondi in struct tm, mi servirà per 
+                    struct tm *login_time_tm = localtime(&login_time_sec);
+                    time_t t = time(NULL);
+                    char login_time_format[80];
+                    if ( (t - login_time_sec) < 15552000 )
+                    {   
+                        strftime(login_time_format,sizeof(login_time_format), "%b %d %H:%M", login_time_tm);
+                    }
+                    else
+                    {
+                        strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
+                    }
+                    
+                    printf("%s (%s)\t",login_time_format, ut -> ut_host);
+
+                    // Office
+                    printf("\t");
+
+                    // Office phone
+                    printf("\n");
+                    
+                }
             }
-            //username
-            printf("%s \t", ut -> ut_user );
-            
-            //Real Name
-            printf("%s\t", pwd->pw_gecos);
-
-            // Terminal
-            printf("%s\t", ut ->ut_line);
-
-            // Idle Time
-            printf(" \t");
-
-            // Login time
-
-            // recupero i secondi passati dal login 
-            time_t login_time_sec = ut -> ut_tv.tv_sec;
-            // trasformo i secondi in struct tm, mi servirà per 
-            struct tm *login_time_tm = localtime(&login_time_sec);
-            time_t t = time(NULL);
-            char login_time_format[80];
-            if ( (t - login_time_sec) < 15552000 )
-            {   
-                strftime(login_time_format,sizeof(login_time_format), "%b %d %H:%M", login_time_tm);
-            }
-            else
-            {
-                strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
-            }
-            
-            printf("%s (%s)\t",login_time_format, ut -> ut_host);
-
-            // Office
-            printf("\t");
-
-            // Office phone
-            printf("\n");
-
-
         }
-        
+        endutent();
     }
-    endutent();
-
-
 }
-
 
 void printL(char **nameUser, int totalNames){
 
     struct passwd *pwd;
     struct utmp *ut;
-    
 
     /* 
     prendo i nomi da nameUser
@@ -133,9 +144,9 @@ void printL(char **nameUser, int totalNames){
 
     */
 
+   setpwent();
     for (int i = 0; i < totalNames ; i++)
     {
-        printf("%s\n",nameUser[i]);
         pwd = getpwnam(nameUser[i]);
         if (pwd != NULL)
         {
@@ -143,112 +154,120 @@ void printL(char **nameUser, int totalNames){
             printf("Login: %s \t\t", pwd -> pw_name);
 
             // Name
-            printf("Name: %s\n", pwd -> pw_gecos);
+            char **words = NULL;
+            words = (char **)malloc(10 * sizeof(char *));
+
+            gecos_format(pwd->pw_gecos, words);
+
+            printf("Name: %s\n", words[0]);
+
+            //office
+            printf("Office: %s, %s\t", words[1],words[2]);
+
+            //home
+            printf("Home Phone: %s\n", words[3]);
 
             // Directory
             printf("Directory: %s\t" , pwd -> pw_dir);
             
             // Shell
             printf("Shell: %s\n" , pwd -> pw_shell);
-
-            // Login time
-            // recupero i secondi passati dal login 
-            time_t login_time_sec = ut -> ut_tv.tv_sec;
-            // trasformo i secondi in struct tm, mi servirà per 
-            struct tm *login_time_tm = localtime(&login_time_sec);
-            time_t t = time(NULL);
-            char login_time_format[80];
-            if ( (t - login_time_sec) < 15552000 )
-            {   
-                strftime(login_time_format,sizeof(login_time_format), "%a %b %d %H:%M", login_time_tm);
-            }
-            else
+            
+            setutent();
+            while ((ut = getutent()) != NULL)
             {
-                strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
-            }
-            printf("On since %s (CET) on %s\n", login_time_format, ut -> ut_host);
-        }
-        
-    }
-    
-
-    /*
-    printf("***PRINT LARGE***\n");
-    printf("Login:[]\t\tName:[]\n");
-    printf("Directory:[]\t\tShell:[]\n");
-    printf("Login time:[]\n");
-    printf("Mail:[]\n");
-    printf("plan:[]\n");
-    printf("\n");
-    */
-
-
-
-    /* while ((ut = getutent()) != NULL)
-    {
-        if (ut->ut_type == USER_PROCESS)
-        {
-            pwd = getpwnam(ut ->ut_user);
-            if (pwd != NULL)
-            {
-                // Login
-                printf("Login: %s \t\t", ut -> ut_name);
-
-                // Name
-                printf("Name: %s\n", pwd -> pw_gecos);
-
-                // Directory
-                printf("Directory: %s\t" , pwd -> pw_dir);
-                
-                // Shell
-                printf("Shell: %s\n" , pwd -> pw_shell);
-
-                // Login time
-                // recupero i secondi passati dal login 
-                time_t login_time_sec = ut -> ut_tv.tv_sec;
-                // trasformo i secondi in struct tm, mi servirà per 
-                struct tm *login_time_tm = localtime(&login_time_sec);
-                time_t t = time(NULL);
-                char login_time_format[80];
-                if ( (t - login_time_sec) < 15552000 )
-                {   
-                    strftime(login_time_format,sizeof(login_time_format), "%a %b %d %H:%M", login_time_tm);
-                }
-                else
+                if (ut->ut_type == USER_PROCESS)
                 {
-                    strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
+                    // Login time
+                    
+                    // recupero i secondi passati dal login 
+                    time_t login_time_sec = ut -> ut_tv.tv_sec;
+
+                    // trasformo i secondi in struct tm, mi servirà per 
+                    struct tm *login_time_tm = localtime(&login_time_sec);
+                    time_t t = time(NULL);
+                    char login_time_format[80];
+                    
+                    if ( (t - login_time_sec) < SEIMESI )
+                    {   
+                        strftime(login_time_format,sizeof(login_time_format), "%a %b %d %H:%M", login_time_tm);
+                    }
+                    else
+                    {
+                        strftime(login_time_format,sizeof(login_time_format), "%b %d %Y", login_time_tm);
+                    }
+                    printf("On since %s (CET) on %s\n", login_time_format, ut -> ut_host); 
                 }
-                printf("On since %s (CET) on %s\n", login_time_format, ut -> ut_host);
                 
-                
-                
-                // Mail
-                printf("Mail:[]\n");
-                // plan
-                printf("plan:[]\n");
-                printf("\n");
+            }
+            endutent();
+            /* ***INIZIO DEL SEGMENTATION FAULT*** */
+            
+            
+            //Mail
+            char mailPath[256];
+            sprintf(mailPath, "/var/mail/%s",pwd-> pw_name);
+            FILE *mailFile = fopen(mailPath, "r");
+            if (mailFile)
+            {
+                printf("Il file esiste e è stato aperto.\n");
+                fclose(mailFile);
             }
             else
             {
-               printf("Informazioni su %s non trovate in passwd", ut->ut_user);
+                printf("No mail.\n");
             }
             
             
-        }
-        
-    } */
+            //optP
+            //TRUE: è stato specificato il comando-> non devi stampare le info;
+            //FALSE: non è stato specificato il comando-> devi stampare le info.
+            
+            if (!optP)
+            {
+                //plan
+                char planPath[256];
+                sprintf(planPath, "%s/.plan",pwd-> pw_dir);
 
+                FILE *planFile = fopen(planPath, "r");
+                if (planFile) {
+                    printf("Il file esiste e è stato aperto.\n");
+                    // Qui puoi leggere o lavorare con il file
+                    fclose(planFile);
+                } else {
+                    printf("No Plan.\n");
+                }
+                //project
+                char projectPath[256];
+                sprintf(projectPath, "%s/.project",pwd-> pw_dir);
 
+                FILE *projectFile = fopen(projectPath, "r");
+                if (projectFile) {
+                    printf("Il file esiste e è stato aperto.\n");
+                    // Qui puoi leggere o lavorare con il file
+                    fclose(projectFile);
+                }
+                    
+                //pgpkey
+                char pgpkeyPath[256];
+                sprintf(pgpkeyPath, "%s/.pgpkey",pwd-> pw_dir);
+
+                FILE *pgpkeyFile = fopen(pgpkeyPath, "r");
+                if (pgpkeyFile) {
+                    printf("Il file esiste e è stato aperto.\n");
+                    // Qui puoi leggere o lavorare con il file
+                    fclose(pgpkeyFile);
+                }
+            }
+            
+        } 
+        endpwent();     
+    }
 }
 
-
-void optionSelection(char *options){
+void optionSelection(char *options, char **nameUser, int totalNames){
         
     int valida = 1; //flag per il corretto inserimento delle opzioni
-
-    // visualizza sul terminale che opzioni ho scritto sul terminale
-    printString(options);
-
 
     for (int i = 0; options[i] != '\0'; i++)
     {
@@ -284,122 +303,56 @@ void optionSelection(char *options){
 
     if (valida)
     {
-        printf("le opzioni sono corrette\n");
         if (optL)
         {
-            
-            //printL();
+            printL(nameUser, totalNames);
         }else
         {
-            printS();
+            printS(nameUser, totalNames);
         }
         
         
     }else
     {
-        printf("opzioni errate, riprovare");
+        printf("opzioni errate, riprovare\n");
     }
     
     
 
 }
 
-/*
-void userSelection (char **names, int totalnames){
+void userSelection(char ***names, int *totalnames) {
     
-    struct utmp *ut;
-    int i = 0;
-    
-    setutent();
-    //se non sono stati specificati dei nomi utente
-    if (*names == NULL)
-    {
+    // Se non sono stati specificati dei nomi utente
+    if (*totalnames == 0) {
+
+        struct utmp *ut;
+        int i = 0;
+
+        setutent();
+
         // Inizializza un array dinamico per i nomi degli utenti
         *names = (char **)malloc(100 * sizeof(char *)); // Allocazione per 100 utenti
         if (*names == NULL) {
             perror("Memory allocation failed");
             return;
-        }
-        
-        while ((ut= getutent()) != NULL )
-        {
-            if (ut->ut_type == USER_PROCESS)
-            {
-                char utente[32];
-                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
-                utente[sizeof(utente) - 1] = '\0';
-                // Alloca memoria per ogni nome e lo copia nell'array names
-                names[i] = strdup(utente);
-                i++;
-            }
-        }
-
-        *totalnames = i;
-
-        for (int i = 0; i < totalnames; i++)
-        {
-            printf("%s\n", names[i]);
-        }
-        
-        
-    } 
-    //  Nel caso in cui siano stati specificati dei nomi
-    else
-    {
-        while ((ut= getutent()) != NULL )
-        {
-            if (ut->ut_type == USER_PROCESS)
-            {
-                char utente[32];
-                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
-                utente[sizeof(utente) - 1] = '\0';
-                
-                // verifico se il nome utente preso è dentro l'array names iterando 
-                for (int j = 0; j < *totalnames; j++)
-                {
-                    if (strcmp(*names[j], utente) == 0)
-                    {
-                        printf("utente trovato\n");
-                    }
-                    
-                }
-                
-            }
-        }
-    }
-    
-    endutent();
-}
-*/
-
-void userSelection(char **names, int *totalnames) {
-    
-    struct utmp *ut;
-    int i = 0;
-    
-    setutent();
-
-    // Se non sono stati specificati dei nomi utente
-    if (names == NULL) {
-
-        // Inizializza un array dinamico per i nomi degli utenti
-        names = (char **)malloc(100 * sizeof(char *)); // Allocazione per 100 utenti
-        if (names == NULL) {
-            perror("Memory allocation failed");
-            return;
+            
         }
 
 
         while ((ut = getutent()) != NULL) {
+
             int valida = 0; // flag per il controllo dei duplicati
+
             if (ut->ut_type == USER_PROCESS) {
+
                 char utente[32];
                 strncpy(utente, ut->ut_user, sizeof(utente) - 1);
                 utente[sizeof(utente) - 1] = '\0';
 
                 for (int j = 0; j < i; i++)
                 {
-                    if (strcmp(utente,names[j]) == 0)
+                    if (strcmp(utente,*names[j]) == 0)
                     {
                         valida = 1; // duplicato trovato
                         break;
@@ -413,9 +366,9 @@ void userSelection(char **names, int *totalnames) {
                 }
                 
                 // Alloca memoria per il nome dell'utente e lo copia nell'array names
-                names[i] = strdup(utente);
+                *names[i] = strdup(utente);
                 
-                if (names[i] == NULL) {
+                if (*names[i] == NULL) {
                     perror("Memory allocation failed for username");
                     break;
                 } 
@@ -426,35 +379,66 @@ void userSelection(char **names, int *totalnames) {
         
 
         *totalnames = i;
-
-         // Stampa i nomi degli utenti trovati
-        for (int j = 0; j < *totalnames; j++) {
-            printf("%s\n", names[j]);
-        } 
         
-    } 
-    // Nel caso in cui siano stati specificati dei nomi
-    else {
-        while ((ut = getutent()) != NULL) {
-            if (ut->ut_type == USER_PROCESS) {
-                char utente[32];
-                strncpy(utente, ut->ut_user, sizeof(utente) - 1);
-                utente[sizeof(utente) - 1] = '\0';
 
-                // Verifica se il nome utente è presente nell'array names
-                for (int j = 0; j < *totalnames; j++) {
-                    if (strcmp(names[j], utente) == 0) {
-                        printf("Utente trovato: %s\n", utente);
+        endutent();
+    } 
+
+    /* 
+    Nel caso in cui siano stati specificati dei nomi
+    devo controllare che i nomi utenti specificati sono nomi di utenti presenti
+    */
+
+    else {
+
+        struct passwd *pwd;
+
+        for (int i = 0; i < *totalnames; i++)
+        {
+            int valida = 0 ; // flag per vedere se ho trovato il nome
+            setpwent();
+
+            while ((pwd = getpwent()) != NULL)
+            {
+                    char utente[32];
+                    strncpy(utente, pwd ->pw_name, sizeof(utente) - 1);
+                    utente[sizeof(utente) - 1] = '\0';
+                    if (strcmp(utente,*names[i]) == 0)
+                    {
+                       valida = 1; // nome utente trovato
+                       
                     }
-                }
+            }
+            endpwent();
+
+            if (!valida)
+            {
+                printf("ERRORE: %s non trovato tra i nomi utenti\n", *names[i]);
             }
         }
+        
+
     }
 
-    endutent();
+    
 }
 
+void gecos_format(char *gecos, char **words){
+    
 
-void geocos_format(char *gecos){
-    str
+    char *token;
+    int i = 0;
+
+    // Ottieni il primo token
+    token = strtok(gecos, ",");
+
+    while (token != NULL) {
+
+        words[i]= strdup(token);
+        i ++;
+        token = strtok(NULL, ","); // Ottieni il token successivo
+    }
+    
+
+    return;
 }
