@@ -62,7 +62,7 @@ int main(int argc, char const *argv[])
         exit(-1);
     }
     
-    printf("Server attivo alla porta %d, in attesa di connessioni", ntohs(server.sin_port));
+    printf("Server attivo alla porta %d, in attesa di connessioni\n", ntohs(server.sin_port));
     while (1)
     {
         socklen_t length = sizeof(client);
