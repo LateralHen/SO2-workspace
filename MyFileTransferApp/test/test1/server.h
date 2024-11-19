@@ -10,6 +10,7 @@
 #include <ctype.h>
 
 #define MAX_CONNECTION 5
+#define BUFFER_SIZE 1024
 
 void make_directory(char *dir);
 

@@ -78,9 +78,9 @@ int main(int argc, char const *argv[])
 
     //VARIABILI
     struct sockaddr_in server_addr,client_addr;// indirizzi del server e del client
-    int server_fd; // socket del server
+    int server_fd, client_fd; // socket del server e del client
     int lenght;
-
+    char buffer[BUFFER_SIZE];
     
     
     // creazione socket
@@ -110,6 +110,25 @@ int main(int argc, char const *argv[])
     }
     
     printf("Server in ascolto su %s:%d\n", server_address, server_port);
+
+    // Accetta una connessione (blocca finché non arriva un client)
+    socklen_t addr_len = sizeof(client_addr);
+    while (1) {
+        client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+        if (client_fd == -1) {
+            perror("Errore nell'accettare la connessione");
+            continue;
+        }
+
+        printf("Connessione accettata da %s:%d\n",inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+        
+        printf("Chiusura della connessione con il client...\n");
+        close(client_fd);
+        printf("Connassione chiusa.\n In attesa di nuova connessione...\n");
+    }
+
+
 
 
     return 0;
