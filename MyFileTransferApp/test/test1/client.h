@@ -10,7 +10,12 @@
 #include <ctype.h>
 
 
+typedef struct MSG
+{
+    char *id;
+    char *localpath_file; // filepath/nome file
+    char *local_file; //contenuto del file 
+    char *remotepath_file; // filepath/nome_file
+    char *remote_file; // contenuto file
+}MSG;
 
-void optionSelection(int numArg, char *arg[]);
-
-void connection(char address, int port);

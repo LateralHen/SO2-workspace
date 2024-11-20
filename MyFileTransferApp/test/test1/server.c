@@ -81,6 +81,7 @@ int main(int argc, char const *argv[])
     int server_fd, client_fd; // socket del server e del client
     int lenght;
     char buffer[BUFFER_SIZE];
+    MSG messaggio;
     
     
     // creazione socket
@@ -121,8 +122,15 @@ int main(int argc, char const *argv[])
         }
 
         printf("Connessione accettata da %s:%d\n",inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-
         
+        if (read(client_fd,&messaggio, sizeof(messaggio)) < 0)
+        {
+            perror("Read error");
+            exit(-1);
+        }
+        
+        print("Messaggio ricevuto.\n pathsorgente : %s\n pathremoto: %s\n", messaggio.localpath_file,messaggio.remotepath_file);
+
         printf("Chiusura della connessione con il client...\n");
         close(client_fd);
         printf("Connassione chiusa.\n In attesa di nuova connessione...\n");
