@@ -1,6 +1,10 @@
 {
     "files.associations": {
         "string": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "server.h": "c",
+        "stdio.h": "c",
+        "client1.h": "c",
+        "server1.h": "c"
     }
 }
