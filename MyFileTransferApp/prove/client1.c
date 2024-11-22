@@ -70,12 +70,14 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
     }
+
     // Verifica che l'indirizzo del server e la porta siano stati forniti
     if (daticonn.server_address == NULL || daticonn.port == 0) {
         
         printf("Error: server address and port are required.\n");
         exit(EXIT_FAILURE);
     }
+    
     //Se non viene specificata l'opzione -o
     if (daticonn.command2 != 'o')
     {
@@ -89,8 +91,6 @@ int main(int argc, char *argv[])
             daticonn.local_file = daticonn.remote_file;
         }
     }
-
-
 
     // Gestione delle azioni in base al comando
     switch (daticonn.command) {

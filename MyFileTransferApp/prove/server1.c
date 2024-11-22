@@ -4,14 +4,13 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include "server1.h"
 
 int main(int argc, char const *argv[])
 {
     //varibili di input 
-    char *server_address = NULL;
-    int server_port = 0;
-    char *root_dir = NULL;
 
     //VARIABILI
     struct sockaddr_in server_addr,client_addr;// indirizzi del server e del client
@@ -77,6 +76,8 @@ int main(int argc, char const *argv[])
     }
     // creazione socket
     server_fd = socket(AF_INET,SOCK_STREAM,0);
+    make_root(root_dir);
+
     if (server_fd < 0)
     {
         perror("Socket error\n");
@@ -176,9 +177,7 @@ void send_file(FILE *file, int socket) {
 
 
 void processing( int socket){
-    /*
-    qui io in base al comando che ricevo, preparo il server a fare le operazioni richieste.
-    */
+    /* qui io in base al comando che ricevo, preparo il server a fare le operazioni richieste */
     
     // Comando
     char command;       
@@ -194,7 +193,6 @@ void processing( int socket){
     if (recv(socket, &pathlen, sizeof(pathlen), 0) <= 0) {
     perror("Errore durante la ricezione della dimensione del path");
     close(socket);
-
     }
     printf("dimensione: %d \n", pathlen);
 
@@ -204,37 +202,46 @@ void processing( int socket){
     perror("Errore durante la ricezione del comando");
     close(socket);
     }
-    printf("Comando ricevuto: %s \n", path);
-
+    printf("Percorso ricevuto: %s \n\n", path);
     
-    char *filename = NULL;
-    char *pathfile = NULL;
-    split_path(path, pathfile, filename);
+    //aggiunta della root directory
+    size_t len_root = strlen(root_dir);
+    size_t len_path = strlen(path);
+    char* full_path = (char*)malloc((len_path + len_root + 2));
+    
+    snprintf(full_path, len_path + len_root + 2, "%s/%s", root_dir, path);
 
-    printf("il path ricevuto è: %s\nIl nome del file ricevuto è:%s\n", pathfile, filename );
+    char *filename = (char *)malloc(pathlen * sizeof(char));
+    char *pathfile = (char *)malloc(pathlen * sizeof(char));
+
+    split_path(full_path, pathfile, filename);
+
+    printf("il path ricevuto è: %s\nIl nome del file ricevuto è:%s\n\n", pathfile, filename );
     
     
     switch (command)
     {
     case 'w':
+        printf("***FUNZIONE DI WRITE***\n");
+        printf("path completo: %s\n", full_path);
         /*
         In questo caso il client vuole inviare il file e lo vuole salvare all'indirizzo selezionato con il nome selezionato.
         Qui devo invocare quindi la funzione di recive file per ricevere i dati del file in questione.
         Quando la trasmissione dei dati del file è terminata devo chiudere la connessione con il client e salvare il file in quel path con quel filename.
         */
-        //printf("Ricezione della richiesta...\n");
+
         //devo controllare se il file e il path esite (funzione da creare)
-        
-        
         //apertura del file
-        //FILE *file = fopen(path, "wb");
-        //if (!file) // se il file non esiste/ci sono errori nell'aprire il file
+        FILE *file = fopen(full_path, "wb");
+        if (!file) // se il file non esiste/ci sono errori nell'aprire il file
         {
-            //perror("Errore nell'aprire il file per la scrittura\n");
+            perror("Errore nell'aprire il file:");
+            printf("Creazione del file...\n");
+            create_file(full_path);
+        }else{
 
-
+            printf("file trovato\n");
         }
-
         break;
     
     case 'r':
@@ -257,5 +264,84 @@ void processing( int socket){
 
         break;
     }
-    
 }
+
+void make_root(char *dir) {
+    if (access(dir, F_OK) == -1) { // Controlla se la directory non esiste
+        if (mkdir(dir, 0777) == -1) { // Prova a creare la directory
+            perror("Errore nella creazione della directory");
+            exit(1);
+        } else {
+            printf("Directory '%s' creata.\n", dir);
+        }   
+    } else { // La directory esiste già
+        printf("La directory '%s' esiste già.\n", dir);
+    }
+}
+
+
+void create_file(char *full_path){
+    /* 
+    input:
+        - path: percorso completo di un file; es. "nome/del/file/name.txt"
+        PATH È UN PERCORSO RELATIVO NON HA BISOGNO DI / ALL'INIZIO.
+    passaggi:
+        - controllare quali cartelle del percorso sono presenti e quali invece bisogna creare;
+            - la root è la prima cartella del path;
+            - il filename è l'ultimo elemento.
+        - creato tutto il percorso bisogna creare il file.
+     */
+    // Divide il percorso completo in path e filename
+    char path[1024];
+    char filename[256];
+
+    // Usa split_path per separare il percorso dal nome del file
+    split_path(full_path, path, filename);
+
+    // Crea le directory necessarie (senza aggiungere root_dir)
+    if (strlen(path) > 0) {
+        char built_path[1024] = "";
+        char *dir_part = strtok(path, "/");
+
+        // Aggiungi il primo segmento del path direttamente
+        if (dir_part != NULL) {
+            strcpy(built_path, dir_part); // Inizia con il primo segmento senza '/'
+            dir_part = strtok(NULL, "/");
+        }
+
+        while (dir_part) {
+            strcat(built_path, "/");
+            strcat(built_path, dir_part);
+
+            //debug per vedere cosa cerca di costruire 
+            printf("Creando la directory: %s\n", built_path);
+
+            // Crea la directory (relativa alla root directory serverDir)
+            if (access(built_path, F_OK) == -1) { 
+                // Se la directory non esiste, tenta di crearla
+                if (mkdir(built_path, 0777) != 0 && errno != EEXIST) {
+                    fprintf(stderr, "Errore nella creazione della directory '%s': %s\n", built_path, strerror(errno));
+                    return;
+                } else {
+                    printf("Directory creata: %s\n", built_path);
+                }
+            } else {
+                printf("Directory esistente: %s\n", built_path);
+            }
+
+            dir_part = strtok(NULL, "/");
+        }
+    }
+
+    // Ora crea il file all'interno del percorso completo fornito
+    FILE *file = fopen(full_path, "wb");  // Usa "wb" per scrivere un file binario
+    if (file == NULL) {
+        perror("Errore nella creazione del file");
+        return;
+    }
+
+    printf("File creato con successo: %s\n", full_path);
+    fclose(file);
+}
+
+
