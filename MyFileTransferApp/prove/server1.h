@@ -13,17 +13,13 @@ char *root_dir = NULL;
 
 int is_numeric(char *str);
 
-void receive_file(FILE *file, int socket);
+void receive_file(const char *path, int socket);
 
-void send_file(FILE *file, int socket);
+void send_file(const char *path, int socket);
 
 void processing( int socket);
 
 void split_path(const char *full_path, char *path, char *filename);
-
-void receive_file(FILE *file, int socket);
-
-void send_file(FILE *file, int socket);
 
 void create_file(char *full_path);
 

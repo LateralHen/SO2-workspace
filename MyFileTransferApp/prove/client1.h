@@ -18,10 +18,12 @@ typedef struct InfoCon {
 
 const char *base_dir = "clientDir";
 
-void receive_file(FILE *file, int socket);
+void receive_file(const char *path, int socket);
 
-void send_file(FILE *file, int socket);
+void send_file(const char *path, int socket);
 
 void create_file(char *full_path);
 
 void split_path(const char *full_path, char *path, char *filename);
+
+void fix_path(const char *input_path, char *output_path);

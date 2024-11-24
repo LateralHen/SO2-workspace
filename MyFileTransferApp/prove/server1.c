@@ -155,24 +155,68 @@ void split_path(const char *full_path, char *path, char *filename){
     }
 }
 
-void receive_file(FILE *file, int socket) {
-    char buffer[BUFFER_SIZE];
-    ssize_t bytes_received;
-
-    // Riceve dal socket e scrive nel file
-    while ((bytes_received = recv(socket, buffer, BUFFER_SIZE, 0)) > 0) {
-        fwrite(buffer, 1, bytes_received, file);
-    }
-}
-
-void send_file(FILE *file, int socket) {
+void send_file(const char *path, int socket) {
     char buffer[BUFFER_SIZE];
     size_t bytes_read;
 
+    // Apre il file in modalità lettura binaria
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        perror("Errore nell'aprire il file");
+        return;
+    }
+
     // Legge dal file e invia al socket
     while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
-        send(socket, buffer, bytes_read, 0);
+        ssize_t bytes_sent = send(socket, buffer, bytes_read, 0);
+        
+        // Controlla se l'invio ha avuto successo
+        if (bytes_sent < 0) {
+            perror("Errore durante l'invio dei dati");
+            fclose(file);
+            return;
+        }
+
+        // Verifica che siano stati inviati tutti i byte letti
+        if (bytes_sent < bytes_read) {
+            fprintf(stderr, "Non tutti i byte sono stati inviati al socket\n");
+            fclose(file);
+            return;
+        }
     }
+
+    // Chiude il file dopo aver inviato tutti i dati
+    fclose(file);
+}
+
+void receive_file(const char *path, int socket) {
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_received;
+
+    // Apre il file in modalità scrittura binaria
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) {
+        perror("Errore nell'aprire il file");
+        return;
+    }
+
+    // Riceve dal socket e scrive nel file
+    while ((bytes_received = recv(socket, buffer, BUFFER_SIZE, 0)) > 0) {
+        size_t bytes_written = fwrite(buffer, 1, bytes_received, file);
+        if (bytes_written < bytes_received) {
+            perror("Errore durante la scrittura del file");
+            fclose(file);
+            return;
+        }
+    }
+
+    // Verifica se c'è stato un errore nella ricezione
+    if (bytes_received < 0) {
+        perror("Errore durante la ricezione dei dati");
+    }
+
+    // Chiude il file dopo aver ricevuto tutti i dati
+    fclose(file);
 }
 
 
@@ -232,7 +276,7 @@ void processing( int socket){
 
         //devo controllare se il file e il path esite (funzione da creare)
         //apertura del file
-        FILE *file_write = fopen(full_path, "wb");
+/*         FILE *file_write = fopen(full_path, "wb");
         if (!file_write) // se il file non esiste/ci sono errori nell'aprire il file
         {
             perror("Errore nell'aprire il file:");
@@ -243,9 +287,8 @@ void processing( int socket){
         else{
             printf("file trovato\n");
 
-        }
-        receive_file(file_write, socket);
-        fclose(file_write);
+        } */
+        receive_file(full_path, socket);
         close(socket);
         break;
     
@@ -259,15 +302,14 @@ void processing( int socket){
         printf("path completo: %s\n", full_path);
         //devo controllare se il file e il path esite (funzione da creare)
         //apertura del file
-        FILE *file_read = fopen(full_path, "rb");
+/*         FILE *file_read = fopen(full_path, "rb");
         if (!file_read) // se il file non esiste/ci sono errori nell'aprire il file
         {
             perror("Errore nell'aprire il file:");
             close(socket);
-        }
+        } */
         printf("invio file...\n");
-        send_file(file_read, socket);
-        fclose(file_read);
+        send_file(full_path, socket);
         printf("invio file completato.\n");
         close(socket);
         break;
@@ -300,7 +342,7 @@ void make_root(char *dir) {
     }
 }
 
-void create_file(char *full_path){
+void create_file(char *full_path){   
     // Divide il percorso completo in path e filename
     char path[1024];
     char filename[256];
