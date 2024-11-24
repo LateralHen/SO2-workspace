@@ -142,7 +142,8 @@ int main(int argc, char *argv[])
             // invia dimensione path
             int pathlen = strlen(daticonn.remote_path) + 1;
             printf("dimensione: %d \n", pathlen);
-            if (send(client_fd,&pathlen, sizeof(pathlen), 0) <= 0) {
+            if (send_message(client_fd,&pathlen, sizeof(pathlen))<= 0)
+            {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -150,7 +151,7 @@ int main(int argc, char *argv[])
 
             // invia il path 
             printf("path : %s\n",daticonn.remote_path);
-            if (send(client_fd,daticonn.remote_path, pathlen, 0) <= 0) {
+            if (send_message (client_fd,daticonn.remote_path, pathlen) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -165,7 +166,7 @@ int main(int argc, char *argv[])
             //dimensione path
             int pathlen = strlen(daticonn.local_path) + 1;
             printf("dimensione: %d \n", pathlen);
-            if (send(client_fd,&pathlen, sizeof(pathlen), 0) <= 0) {
+            if (send_message(client_fd,&pathlen, sizeof(pathlen)) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -175,7 +176,7 @@ int main(int argc, char *argv[])
             //daticonn.local_path = server/prova.txt
 
             printf("path : %s\n",daticonn.local_path);
-            if (send(client_fd,daticonn.local_path, pathlen, 0) <= 0) {
+            if (send_message(client_fd,daticonn.local_path, pathlen) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -199,14 +200,14 @@ int main(int argc, char *argv[])
             // invii la dimensione del il path del file desiderato
             int pathlen = strlen(daticonn.remote_path) + 1;
             printf("dimensione: %d \n", pathlen);
-            if (send(client_fd,&pathlen, sizeof(pathlen), 0) <= 0) {
+            if (send_message(client_fd,&pathlen, sizeof(pathlen)) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
             }
             // invii il path 
             printf("path : %s\n",daticonn.remote_path);
-            if (send(client_fd,daticonn.remote_path, pathlen, 0) <= 0) {
+            if (send_message(client_fd,daticonn.remote_path, pathlen) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -253,69 +254,6 @@ int main(int argc, char *argv[])
 }
 
 
-void send_file(const char *path, int socket) {
-    char buffer[BUFFER_SIZE];
-    size_t bytes_read;
-
-    // Apre il file in modalità lettura binaria
-    FILE *file = fopen(path, "rb");
-    if (file == NULL) {
-        perror("Errore nell'aprire il file");
-        return;
-    }
-
-    // Legge dal file e invia al socket
-    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
-        ssize_t bytes_sent = send(socket, buffer, bytes_read, 0);
-        
-        // Controlla se l'invio ha avuto successo
-        if (bytes_sent < 0) {
-            perror("Errore durante l'invio dei dati");
-            fclose(file);
-            return;
-        }
-
-        // Verifica che siano stati inviati tutti i byte letti
-        if (bytes_sent < bytes_read) {
-            fprintf(stderr, "Non tutti i byte sono stati inviati al socket\n");
-            fclose(file);
-            return;
-        }
-    }
-
-    // Chiude il file dopo aver inviato tutti i dati
-    fclose(file);
-}
-
-void receive_file(const char *path, int socket) {
-    char buffer[BUFFER_SIZE];
-    ssize_t bytes_received;
-
-    // Apre il file in modalità scrittura binaria
-    FILE *file = fopen(path, "wb");
-    if (file == NULL) {
-        perror("Errore nell'aprire il file");
-        return;
-    }
-
-    // Riceve dal socket e scrive nel file
-    while ((bytes_received = recv(socket, buffer, BUFFER_SIZE, 0)) > 0) {
-        size_t bytes_written = fwrite(buffer, 1, bytes_received, file);
-        if (bytes_written < bytes_received) {
-            perror("Errore durante la scrittura del file");
-            fclose(file);
-            return;
-        }
-    }
-
-    // Verifica se c'è stato un errore nella ricezione
-    if (bytes_received < 0) {
-        perror("Errore durante la ricezione dei dati");
-    }
-
-    // Chiude il file dopo aver ricevuto tutti i dati
-    fclose(file);
-}
 
 void create_file(char *full_path){
 
@@ -422,4 +360,73 @@ void fix_path(const char *input_path, char *output_path) {
     }
 }
 
+int send_message(int socket, const void *message, size_t length) {
+    ssize_t bytes_sent = 0;
+    while (bytes_sent < length) {
+        ssize_t result = send(socket, (char*)message + bytes_sent, length - bytes_sent, 0);
+        if (result < 0) {
+            perror("Errore durante l'invio del messaggio");
+            return -1;  // Errore durante l'invio
+        }
+        bytes_sent += result;
+    }
+    return bytes_sent;  // Ritorna il numero totale di byte inviati
+}
 
+ssize_t receive_message(int socket, void *buffer, size_t length) {
+    ssize_t bytes_received = 0;
+    while (bytes_received < length) {
+        ssize_t result = recv(socket, (char*)buffer + bytes_received, length - bytes_received, 0);
+        if (result < 0) {
+            perror("Errore durante la ricezione del messaggio");
+            return -1;  // Errore durante la ricezione
+        }
+        if (result == 0) {
+            printf("Connessione chiusa dal client\n");
+            return 0;  // Connessione chiusa
+        }
+        bytes_received += result;
+    }
+    return bytes_received;  // Ritorna il numero totale di byte ricevuti
+}
+
+
+void send_file(const char *path, int socket) {
+    char buffer[BUFFER_SIZE];
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        perror("Errore nell'aprire il file");
+        return;
+    }
+
+    size_t bytes_read;
+    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
+        if (send(socket, buffer, bytes_read, 0) < 0) {
+            perror("Errore durante l'invio dei dati");
+            fclose(file);
+            return;
+        }
+    }
+
+    fclose(file);
+}
+
+void receive_file(const char *path, int socket) {
+    char buffer[BUFFER_SIZE];
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) {
+        perror("Errore nell'aprire il file");
+        return;
+    }
+
+    ssize_t bytes_received;
+    while ((bytes_received = recv(socket, buffer, BUFFER_SIZE, 0)) > 0) {
+        fwrite(buffer, 1, bytes_received, file);
+    }
+
+    if (bytes_received < 0) {
+        perror("Errore durante la ricezione dei dati");
+    }
+
+    fclose(file);
+}

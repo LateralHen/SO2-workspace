@@ -19,6 +19,11 @@ int main(int argc, char *argv[]) {
     while ((opt = getopt(argc, argv, "a:p:d:")) != -1) {
         switch (opt) {
             case 'a':
+                if (inet_addr(optarg) == INADDR_NONE)
+                {
+                    perror("Indirizzo Ip non valido.\n");
+                    return 1;
+                }
                 server_address = optarg;
                 break;
             case 'p':
@@ -44,8 +49,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Creazione del socket
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) {
+    if (server_fd = socket(AF_INET, SOCK_STREAM, 0) < 0) {
         perror("Errore nella creazione del socket");
         exit(1);
     }
@@ -88,6 +92,7 @@ int main(int argc, char *argv[]) {
 }
 
 // Implementazione delle funzioni correlate ai file
+
 void split_path(const char *full_path, char *path, char *filename) {
     const char *last_slash = strrchr(full_path, '/');
     if (last_slash != NULL) {
@@ -100,6 +105,37 @@ void split_path(const char *full_path, char *path, char *filename) {
         strcpy(filename, full_path);
     }
 }
+
+int send_message(int socket, const void *message, size_t length) {
+    ssize_t bytes_sent = 0;
+    while (bytes_sent < length) {
+        ssize_t result = send(socket, (char*)message + bytes_sent, length - bytes_sent, 0);
+        if (result < 0) {
+            perror("Errore durante l'invio del messaggio");
+            return -1;  // Errore durante l'invio
+        }
+        bytes_sent += result;
+    }
+    return bytes_sent;  // Ritorna il numero totale di byte inviati
+}
+
+ssize_t receive_message(int socket, void *buffer, size_t length) {
+    ssize_t bytes_received = 0;
+    while (bytes_received < length) {
+        ssize_t result = recv(socket, (char*)buffer + bytes_received, length - bytes_received, 0);
+        if (result < 0) {
+            perror("Errore durante la ricezione del messaggio");
+            return -1;  // Errore durante la ricezione
+        }
+        if (result == 0) {
+            printf("Connessione chiusa dal client\n");
+            return 0;  // Connessione chiusa
+        }
+        bytes_received += result;
+    }
+    return bytes_received;  // Ritorna il numero totale di byte ricevuti
+}
+
 
 void send_file(const char *path, int socket) {
     char buffer[BUFFER_SIZE];
@@ -142,30 +178,33 @@ void receive_file(const char *path, int socket) {
 }
 
 // Gestione delle connessioni
+
 void processing(int socket) {
     char command;
-    if (recv(socket, &command, sizeof(char), 0) <= 0) {
-        perror("Errore durante la ricezione del comando");
+    if (receive_message(socket, &command, sizeof(char)) < 0){
+        perror("Errore durante l'invio del comando");
         close(socket);
         return;
     }
 
     int pathlen;
-    if (recv(socket, &pathlen, sizeof(pathlen), 0) <= 0) {
+    if (receive_message(socket, &pathlen, sizeof(pathlen)) < 0){
         perror("Errore durante la ricezione della dimensione del path");
         close(socket);
         return;
     }
 
+
     char *full_path = (char *)malloc(pathlen);
-    if (recv(socket, full_path, pathlen, 0) <= 0) {
+    if (receive_message(socket, full_path, pathlen) < 0)
+    {
         perror("Errore durante la ricezione del path");
         free(full_path);
         close(socket);
         return;
     }
-
-    fix_path(full_path, "clientDir");
+    
+    fix_path(full_path, "clientDir");// TODO: aggingere ricezione della root del client
     char filename[256], pathfile[1024];
     split_path(full_path, pathfile, filename);
 
@@ -191,6 +230,7 @@ void processing(int socket) {
 }
 
 // Funzioni di gestione della root e percorsi
+
 void make_root(char *dir) {
     if (access(dir, F_OK) == -1 && mkdir(dir, 0777) == -1) {
         perror("Errore nella creazione della directory");

@@ -93,3 +93,33 @@ void make_root(char *dir);
  * @param clientDir directory del client da rimuovere.
  */
 void fix_path(char *full_path, const char *clientDir);
+
+/**
+ * Riceve un messaggio dal client e lo salva nel buffer.
+ * 
+ * Questa funzione legge i dati inviati dal client attraverso il socket, 
+ * e li copia nel buffer passato come parametro. La funzione riceve 
+ * i dati fino a una lunghezza specificata.
+ * 
+ * @param socket Socket utilizzato per ricevere il messaggio.
+ * @param buffer Buffer dove memorizzare i dati ricevuti.
+ * @param length Lunghezza del buffer, ovvero il numero massimo di byte 
+ *               da ricevere.
+ * @return Numero di byte ricevuti, o -1 in caso di errore.
+ */
+ssize_t receive_message(int socket, void *buffer, size_t length);
+
+/**
+ * Invia un messaggio al client tramite il socket.
+ * 
+ * Questa funzione invia i dati contenuti nel messaggio attraverso il socket. 
+ * I dati sono inviati in blocchi fino a una lunghezza specificata nel parametro 
+ * `length`. La funzione gestisce l'invio del messaggio in modo che tutto 
+ * il contenuto venga inviato correttamente.
+ * 
+ * @param socket Socket utilizzato per inviare il messaggio.
+ * @param message Messaggio da inviare al client.
+ * @param length Lunghezza del messaggio da inviare.
+ * @return Numero di byte inviati, o -1 in caso di errore.
+ */
+int send_message(int socket, const void *message, size_t length);
