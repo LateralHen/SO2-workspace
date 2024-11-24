@@ -232,16 +232,21 @@ void processing( int socket){
 
         //devo controllare se il file e il path esite (funzione da creare)
         //apertura del file
-        FILE *file = fopen(full_path, "wb");
-        if (!file) // se il file non esiste/ci sono errori nell'aprire il file
+        FILE *file_write = fopen(full_path, "wb");
+        if (!file_write) // se il file non esiste/ci sono errori nell'aprire il file
         {
             perror("Errore nell'aprire il file:");
             printf("Creazione del file...\n");
             create_file(full_path);
-        }else{
-
-            printf("file trovato\n");
+            FILE *file_write = fopen(full_path, "wb");
         }
+        else{
+            printf("file trovato\n");
+
+        }
+        receive_file(file_write, socket);
+        fclose(file_write);
+        close(socket);
         break;
     
     case 'r':
@@ -250,6 +255,21 @@ void processing( int socket){
         Qui devo invocare la funzione di send file per inviare il file in questione.
         Quando finisce la trasmissione devo solamente chiudere la connessione con il client.
         */
+        printf("***FUNZIONE DI READ***\n");
+        printf("path completo: %s\n", full_path);
+        //devo controllare se il file e il path esite (funzione da creare)
+        //apertura del file
+        FILE *file_read = fopen(full_path, "rb");
+        if (!file_read) // se il file non esiste/ci sono errori nell'aprire il file
+        {
+            perror("Errore nell'aprire il file:");
+            close(socket);
+        }
+        printf("invio file...\n");
+        send_file(file_read, socket);
+        fclose(file_read);
+        printf("invio file completato.\n");
+        close(socket);
         break;
     
     case 'l':
@@ -275,22 +295,12 @@ void make_root(char *dir) {
             printf("Directory '%s' creata.\n", dir);
         }   
     } else { // La directory esiste già
+
         printf("La directory '%s' esiste già.\n", dir);
     }
 }
 
-
 void create_file(char *full_path){
-    /* 
-    input:
-        - path: percorso completo di un file; es. "nome/del/file/name.txt"
-        PATH È UN PERCORSO RELATIVO NON HA BISOGNO DI / ALL'INIZIO.
-    passaggi:
-        - controllare quali cartelle del percorso sono presenti e quali invece bisogna creare;
-            - la root è la prima cartella del path;
-            - il filename è l'ultimo elemento.
-        - creato tutto il percorso bisogna creare il file.
-     */
     // Divide il percorso completo in path e filename
     char path[1024];
     char filename[256];
@@ -339,7 +349,6 @@ void create_file(char *full_path){
         perror("Errore nella creazione del file");
         return;
     }
-
     printf("File creato con successo: %s\n", full_path);
     fclose(file);
 }

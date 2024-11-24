@@ -12,12 +12,16 @@ typedef struct InfoCon {
     char command;
     char command2;
 
-    char *local_file;
-    char *remote_file;
+    char *local_path;
+    char *remote_path;
 } InfoCon;
 
-
+const char *base_dir = "clientDir";
 
 void receive_file(FILE *file, int socket);
 
 void send_file(FILE *file, int socket);
+
+void create_file(char *full_path);
+
+void split_path(const char *full_path, char *path, char *filename);
