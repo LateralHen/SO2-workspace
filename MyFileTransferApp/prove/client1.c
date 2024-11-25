@@ -253,7 +253,106 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+int send_message(int socket, const void *message, size_t length) {
+    ssize_t bytes_sent = 0;
+    while (bytes_sent < length) {
+        ssize_t result = send(socket, (char*)message + bytes_sent, length - bytes_sent, 0);
+        if (result < 0) {
+            perror("Errore durante l'invio del messaggio");
+            return -1;  // Errore durante l'invio
+        }
+        bytes_sent += result;
+    }
+    return bytes_sent;  // Ritorna il numero totale di byte inviati
+}
 
+ssize_t receive_message(int socket, void *buffer, size_t length) {
+    ssize_t bytes_received = 0;
+    while (bytes_received < length) {
+        ssize_t result = recv(socket, (char*)buffer + bytes_received, length - bytes_received, 0);
+        if (result < 0) {
+            perror("Errore durante la ricezione del messaggio");
+            return -1;  // Errore durante la ricezione
+        }
+        if (result == 0) {
+            printf("Connessione chiusa dal client\n");
+            return 0;  // Connessione chiusa
+        }
+        bytes_received += result;
+    }
+    return bytes_received;  // Ritorna il numero totale di byte ricevuti
+}
+
+void send_file(const char *path, int socket) {
+    char buffer[BUFFER_SIZE];
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        perror("Errore nell'aprire il file");
+        return;
+    }
+
+    size_t bytes_read;
+    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
+        if (send(socket, buffer, bytes_read, 0) < 0) {
+            perror("Errore durante l'invio dei dati");
+            fclose(file);
+            return;
+        }
+    }
+
+    fclose(file);
+}
+
+void receive_file(const char *path, int socket) {
+    char buffer[BUFFER_SIZE];
+    FILE *file = fopen(path, "wb");
+    if (file == NULL) {
+        perror("Errore nell'aprire il file");
+        return;
+    }
+
+    ssize_t bytes_received;
+    while ((bytes_received = recv(socket, buffer, BUFFER_SIZE, 0)) > 0) {
+        fwrite(buffer, 1, bytes_received, file);
+    }
+
+    if (bytes_received < 0) {
+        perror("Errore durante la ricezione dei dati");
+    }
+
+    fclose(file);
+}
+
+void split_path(const char *full_path, char *path, char *filename){
+
+    // Trova l'ultimo separatore di directory
+    const char *last_slash = strrchr(full_path, '/');
+    
+    if (last_slash != NULL) {
+        // Calcola la lunghezza del path
+        size_t path_length = last_slash - full_path + 1;
+
+        // Copia il path nella variabile
+        strncpy(path, full_path, path_length);
+        path[path_length] = '\0'; // Aggiungi il terminatore
+
+        // Copia il filename
+        strcpy(filename, last_slash + 1);
+    } else {
+        // Se non c'è il separatore, non c'è un path
+        strcpy(path, ""); // Path vuoto
+        strcpy(filename, full_path); // Il filename è l'intera stringa
+    }
+}
+
+void fix_path(const char *input_path, char *output_path) {
+    // Verifica se il path inizia con base_dir
+    if (strncmp(input_path, base_dir, strlen(base_dir)) == 0) {
+        snprintf(output_path, 1024, "%s", input_path);
+    } else {
+        snprintf(output_path, 1024, "%s/%s", base_dir, input_path);
+    }
+}
 
 void create_file(char *full_path){
 
@@ -329,104 +428,3 @@ void create_file(char *full_path){
     fclose(file);
 }
 
-void split_path(const char *full_path, char *path, char *filename){
-
-    // Trova l'ultimo separatore di directory
-    const char *last_slash = strrchr(full_path, '/');
-    
-    if (last_slash != NULL) {
-        // Calcola la lunghezza del path
-        size_t path_length = last_slash - full_path + 1;
-
-        // Copia il path nella variabile
-        strncpy(path, full_path, path_length);
-        path[path_length] = '\0'; // Aggiungi il terminatore
-
-        // Copia il filename
-        strcpy(filename, last_slash + 1);
-    } else {
-        // Se non c'è il separatore, non c'è un path
-        strcpy(path, ""); // Path vuoto
-        strcpy(filename, full_path); // Il filename è l'intera stringa
-    }
-}
-
-void fix_path(const char *input_path, char *output_path) {
-    // Verifica se il path inizia con base_dir
-    if (strncmp(input_path, base_dir, strlen(base_dir)) == 0) {
-        snprintf(output_path, 1024, "%s", input_path);
-    } else {
-        snprintf(output_path, 1024, "%s/%s", base_dir, input_path);
-    }
-}
-
-int send_message(int socket, const void *message, size_t length) {
-    ssize_t bytes_sent = 0;
-    while (bytes_sent < length) {
-        ssize_t result = send(socket, (char*)message + bytes_sent, length - bytes_sent, 0);
-        if (result < 0) {
-            perror("Errore durante l'invio del messaggio");
-            return -1;  // Errore durante l'invio
-        }
-        bytes_sent += result;
-    }
-    return bytes_sent;  // Ritorna il numero totale di byte inviati
-}
-
-ssize_t receive_message(int socket, void *buffer, size_t length) {
-    ssize_t bytes_received = 0;
-    while (bytes_received < length) {
-        ssize_t result = recv(socket, (char*)buffer + bytes_received, length - bytes_received, 0);
-        if (result < 0) {
-            perror("Errore durante la ricezione del messaggio");
-            return -1;  // Errore durante la ricezione
-        }
-        if (result == 0) {
-            printf("Connessione chiusa dal client\n");
-            return 0;  // Connessione chiusa
-        }
-        bytes_received += result;
-    }
-    return bytes_received;  // Ritorna il numero totale di byte ricevuti
-}
-
-
-void send_file(const char *path, int socket) {
-    char buffer[BUFFER_SIZE];
-    FILE *file = fopen(path, "rb");
-    if (file == NULL) {
-        perror("Errore nell'aprire il file");
-        return;
-    }
-
-    size_t bytes_read;
-    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
-        if (send(socket, buffer, bytes_read, 0) < 0) {
-            perror("Errore durante l'invio dei dati");
-            fclose(file);
-            return;
-        }
-    }
-
-    fclose(file);
-}
-
-void receive_file(const char *path, int socket) {
-    char buffer[BUFFER_SIZE];
-    FILE *file = fopen(path, "wb");
-    if (file == NULL) {
-        perror("Errore nell'aprire il file");
-        return;
-    }
-
-    ssize_t bytes_received;
-    while ((bytes_received = recv(socket, buffer, BUFFER_SIZE, 0)) > 0) {
-        fwrite(buffer, 1, bytes_received, file);
-    }
-
-    if (bytes_received < 0) {
-        perror("Errore durante la ricezione dei dati");
-    }
-
-    fclose(file);
-}
