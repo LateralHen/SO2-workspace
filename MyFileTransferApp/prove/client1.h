@@ -11,20 +11,31 @@
  * 
  * @param server_address Indirizzo del server a cui connettersi.
  * @param port Porta del server.
+ */
+typedef struct {
+    char *server_address;
+    int port;
+
+} Address;
+
+
+/**
+ * Struttura che contiene le informazioni del comando passato al client.
+ * 
  * @param command Comando principale da inviare al server.
  * @param command2 Comando secondario (se necessario).
  * @param local_path Percorso locale da utilizzare per il file.
  * @param remote_path Percorso remoto per il file sul server.
+ * 
  */
-typedef struct InfoCon {
-    char *server_address;
-    int port;
+typedef struct ClientComm
+{
     char command;
     char command2;
-
     char *local_path;
     char *remote_path;
-} InfoCon;
+}Command;
+
 
 /** 
  * Directory di base per il client.
@@ -56,6 +67,7 @@ void create_file(char *full_path);
 
 /** 
  * Divide un percorso completo in due parti: il percorso e il nome del file.
+ * Viene utilizzato dentro create_file per separare il path del file dal nome del file.
  * 
  * @param full_path Percorso completo del file.
  * @param path Variabile dove sarà memorizzato il percorso senza il nome del file.
@@ -65,6 +77,7 @@ void split_path(const char *full_path, char *path, char *filename);
 
 /** 
  * Corregge il percorso di input per adattarlo a quello previsto.
+ * 
  * 
  * @param input_path Percorso da correggere.
  * @param output_path Percorso corretto da restituire.
@@ -90,3 +103,9 @@ ssize_t receive_message(int socket, void *buffer, size_t length);
  * @return Numero di byte inviati, o -1 in caso di errore.
  */
 int send_message(int socket, const void *message, size_t length);
+
+
+void processing(int socket);
+
+Address connessione;
+Command comando_imput;

@@ -14,7 +14,6 @@
 int main(int argc, char *argv[])
 {
     int opt;
-    InfoCon daticonn;
     int client_fd;
     struct sockaddr_in server_addr;
 
@@ -26,49 +25,49 @@ int main(int argc, char *argv[])
         {
 
         case 'w':
-            daticonn.command = 'w';// upload(scrittura)
+            comando_imput.command = 'w';// upload(scrittura)
             break;
         
         case 'r':
-            daticonn.command = 'r';// download(lettura)
+            comando_imput.command = 'r';// download(lettura)
             break;
 
         case 'l':
-            daticonn.command = 'l';// Listing(elencare tutti i file)
+            comando_imput.command = 'l';// Listing(elencare tutti i file)
             break;
         
         case 'a':
-            daticonn.server_address = (char *)optarg;
+            connessione.server_address = (char *)optarg;
 
             break;
         
         case 'p':
-            daticonn.port = (int)atoi(optarg);
+            connessione.port = (int)atoi(optarg);
             break;
         
         case 'f':
             // Gestisce il path locale o remoto in base al comando
-            if (daticonn.command == 'w') {
-                daticonn.local_path = optarg; // Path locale per upload
-            } else if (daticonn.command == 'r' || daticonn.command == 'l') {
-                daticonn.remote_path = optarg; // Path remoto per download o elenco
+            if (comando_imput.command == 'w') {
+                comando_imput.local_path = optarg; // Path locale per upload
+            } else if (comando_imput.command == 'r' || comando_imput.command == 'l') {
+                comando_imput.remote_path = optarg; // Path remoto per download o elenco
             } else {
-                fprintf(stderr, "Errore: opzione -f non valida per il comando '%c'.\n", daticonn.command);
+                fprintf(stderr, "Errore: opzione -f non valida per il comando '%c'.\n", comando_imput.command);
                 exit(EXIT_FAILURE);
             }
             break;
 
         case 'o':
             // Gestisce il path remoto o locale in base al comando
-            if (daticonn.command == 'w') {
-                daticonn.remote_path = optarg; // Path remoto per upload
-            } else if (daticonn.command == 'r') {
-                daticonn.local_path = optarg; // Path locale per download
-            } else if (daticonn.command == 'l') {
+            if (comando_imput.command == 'w') {
+                comando_imput.remote_path = optarg; // Path remoto per upload
+            } else if (comando_imput.command == 'r') {
+                comando_imput.local_path = optarg; // Path locale per download
+            } else if (comando_imput.command == 'l') {
                 fprintf(stderr, "Errore: il comando 'l' non può avere l'opzione -o.\n");
                 exit(EXIT_FAILURE);
             } else {
-                fprintf(stderr, "Errore: opzione -o non valida per il comando '%c'.\n", daticonn.command);
+                fprintf(stderr, "Errore: opzione -o non valida per il comando '%c'.\n", comando_imput.command);
                 exit(EXIT_FAILURE);
             }
             break;
@@ -80,38 +79,36 @@ int main(int argc, char *argv[])
     }
 
     // Verifica che l'indirizzo del server e la porta siano stati forniti
-    if (daticonn.server_address == NULL || daticonn.port == 0) {
+    if (connessione.server_address == NULL || connessione.port == 0) {
         
         printf("Error: server address and port are required.\n");
         exit(EXIT_FAILURE);
     }
     
     //Se non viene specificata l'opzione -o
-    if (daticonn.command2 != 'o')
+    if (comando_imput.command2 != 'o')
     {
-
-        if (daticonn.command == 'w'){
-            daticonn.remote_path = daticonn.local_path;
+        if (comando_imput.command == 'w'){
+            comando_imput.remote_path = comando_imput.local_path;
         }
 
-        else if (daticonn.command == 'r'){
-            daticonn.local_path = daticonn.remote_path;
+        else if (comando_imput.command == 'r'){
+            comando_imput.local_path = comando_imput.remote_path;
         }
     }
 
-    printf("Indirizzo IP: %s \nPorta: %d \nCommand: %c \nLocalpath: %s \nRemote path: %s\n", daticonn.server_address,daticonn.port,daticonn.command,daticonn.local_path,daticonn.remote_path);
+    printf("Indirizzo IP: %s \nPorta: %d \nCommand: %c \nLocalpath: %s \nRemote path: %s\n", connessione.server_address,connessione.port,comando_imput.command,comando_imput.local_path,comando_imput.remote_path);
 
     //connessione
     client_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (client_fd < 0)
-    {
+    if (client_fd < 0){
         perror("Socket error\n");
         exit(1);
     }
     
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(daticonn.server_address);
-    server_addr.sin_port = htons(daticonn.port);
+    server_addr.sin_addr.s_addr = inet_addr(connessione.server_address);
+    server_addr.sin_port = htons(connessione.port);
 
     if (connect(client_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("Errore di connessione");
@@ -119,154 +116,8 @@ int main(int argc, char *argv[])
     }
     printf("Connessione al server effettuata.\n");
 
-    // invio del comando
-    if (send(client_fd,&daticonn.command,sizeof(char), 0)<= 0) {
-        perror("Errore durante l'invio del comando");
-        close(client_fd);
-        exit(EXIT_FAILURE);
-    }
-
-
-    // Gestione delle azioni in base al comando
-    switch (daticonn.command) {
-        case 'w':
-            // Upload: file locale -> server remoto
-            if (daticonn.local_path == NULL || daticonn.remote_path == NULL) {
-                printf("Error: for upload, both local file and remote file must be specified.\n");
-                exit(EXIT_FAILURE);
-            }
-            printf("Uploading...\n");
-
-            if (daticonn.command2 == 'o')
-            {
-            // invia dimensione path
-            int pathlen = strlen(daticonn.remote_path) + 1;
-            printf("dimensione: %d \n", pathlen);
-            if (send_message(client_fd,&pathlen, sizeof(pathlen))<= 0)
-            {
-                perror("Errore durante l'invio del comando");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-
-            // invia il path 
-            printf("path : %s\n",daticonn.remote_path);
-            if (send_message (client_fd,daticonn.remote_path, pathlen) <= 0) {
-                perror("Errore durante l'invio del comando");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            //inviare il file
-            send_file(daticonn.remote_path, client_fd);
-            close(client_fd);  
-            }
-            
-            else
-            {
-            //dimensione path
-            int pathlen = strlen(daticonn.local_path) + 1;
-            printf("dimensione: %d \n", pathlen);
-            if (send_message(client_fd,&pathlen, sizeof(pathlen)) <= 0) {
-                perror("Errore durante l'invio del comando");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            //inviare dove il file : path di destinazione e nome del file (considera anche caso con -o)
-
-            //daticonn.local_path = server/prova.txt
-
-            printf("path : %s\n",daticonn.local_path);
-            if (send_message(client_fd,daticonn.local_path, pathlen) <= 0) {
-                perror("Errore durante l'invio del comando");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            //inviare il file
-            
-            send_file(daticonn.local_path, client_fd);
-            close(client_fd); 
-            }
-
-            break;
-
-        case 'r':
-            // Download: file remoto -> file locale
-            if (daticonn.remote_path == NULL || daticonn.local_path == NULL) {
-                printf("Error: for download, both remote file and local file must be specified.\n");
-                exit(EXIT_FAILURE);
-            }
-            printf("Downloading...\n");
-
-            // invii la dimensione del il path del file desiderato
-            int pathlen = strlen(daticonn.remote_path) + 1;
-            printf("dimensione: %d \n", pathlen);
-            if (send_message(client_fd,&pathlen, sizeof(pathlen)) <= 0) {
-                perror("Errore durante l'invio del comando");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            // invii il path 
-            printf("path : %s\n",daticonn.remote_path);
-            if (send_message(client_fd,daticonn.remote_path, pathlen) <= 0) {
-                perror("Errore durante l'invio del comando");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            //Aggiornamento del path
-            char fixed_path[1024];
-            fix_path(daticonn.local_path, fixed_path);
-            daticonn.local_path = strdup(fixed_path); // Aggiorna il valore con il path corretto
-
-            //controllo esistenza del file
-            create_file(daticonn.local_path);
-            // riceve riceve il file richiesto dal server (send_file)
-            printf("ricezione del file...\n");
-            receive_file(daticonn.local_path,client_fd);
-            printf("ricezione del file completata.\n");
-            printf("chiusura connessione.\n");
-           
-            close(client_fd);
-
-
-            break;
-
-        case 'l':
-            // Listing: elenca i file nel percorso remoto
-            if (daticonn.remote_path == NULL) {
-                printf("Error: for listing, remote path must be specified.\n");
-                exit(EXIT_FAILURE);
-            }
-            printf("Listing files in remote path %s on server %s:%d\n", daticonn.remote_path, daticonn.server_address, daticonn.port);
-            // Logica per il listing (es. connessione al server e recupero elenco file)
-
-            //invio dimensione del path
-            int path_len = strlen(daticonn.remote_path) + 1;
-            printf("dimensione: %d \n", path_len);
-            if (send_message(client_fd,&path_len, sizeof(path_len)) <= 0) {
-                perror("Errore durante l'invio della dimensione");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            // invii il path 
-            printf("path : %s\n",daticonn.remote_path);
-            if (send_message(client_fd,daticonn.remote_path, path_len) <= 0) {
-                perror("Errore durante l'invio del path");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            //ricezione del listing e print di esso
-            int resultLen;
-            receive_message(client_fd, &resultLen, sizeof(resultLen));
-            printf("%d\n", resultLen);
-            char *result = (char *) malloc(resultLen);
-            receive_message(client_fd, result, resultLen);
-            printf("cartella: %s\ncontenuto: %s\n", daticonn.remote_path,result);
-            break;
-
-        default:
-            printf("Error: invalid command. Use -w for upload, -r for download, or -l for listing.\n");
-            exit(EXIT_FAILURE);
-    }
+    //elaborazione dei comandi e la gestione del invio/ricevemento dati/file
+    processing(client_fd);
 
 
     return 0;
@@ -324,6 +175,7 @@ void send_file(const char *path, int socket) {
 
 void receive_file(const char *path, int socket) {
     char buffer[BUFFER_SIZE];
+    path = "prova_write.txt";
     FILE *file = fopen(path, "wb");
     if (file == NULL) {
         perror("Errore nell'aprire il file");
@@ -447,3 +299,155 @@ void create_file(char *full_path){
     fclose(file);
 }
 
+void processing(int socket){
+
+    // invio del comando
+    if (send(socket,&comando_imput.command,sizeof(char), 0)<= 0) {
+        perror("Errore durante l'invio del comando");
+        close(socket);
+        exit(EXIT_FAILURE);
+    }
+
+
+    // Gestione delle azioni in base al comando
+    switch (comando_imput.command) {
+        case 'w':
+            // Upload: file locale -> server remoto
+            if (comando_imput.local_path == NULL || comando_imput.remote_path == NULL) {
+                printf("Error: for upload, both local file and remote file must be specified.\n");
+                exit(EXIT_FAILURE);
+            }
+            printf("Uploading...\n");
+
+            if (comando_imput.command2 == 'o')
+            {
+            // invia dimensione path
+            int pathlen = strlen(comando_imput.remote_path) + 1;
+            printf("dimensione: %d \n", pathlen);
+            if (send_message(socket,&pathlen, sizeof(pathlen))<= 0)
+            {
+                perror("Errore durante l'invio del comando");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+
+            // invia il path 
+            printf("path : %s\n",comando_imput.remote_path);
+            if (send_message (socket,comando_imput.remote_path, pathlen) <= 0) {
+                perror("Errore durante l'invio del comando");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+            //inviare il file
+            send_file(comando_imput.remote_path, socket);
+            close(socket);  
+            }
+            
+            else
+            {
+            //dimensione path
+            int pathlen = strlen(comando_imput.local_path) + 1;
+            printf("dimensione: %d \n", pathlen);
+            if (send_message(socket,&pathlen, sizeof(pathlen)) <= 0) {
+                perror("Errore durante l'invio del comando");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+            //inviare dove il file : path di destinazione e nome del file (considera anche caso con -o)
+
+            //comando_imput.local_path = server/prova.txt
+
+            printf("path : %s\n",comando_imput.local_path);
+            if (send_message(socket,comando_imput.local_path, pathlen) <= 0) {
+                perror("Errore durante l'invio del comando");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+            //inviare il file
+            
+            send_file(comando_imput.local_path, socket);
+            close(socket); 
+            }
+
+            break;
+
+        case 'r':
+            // Download: file remoto -> file locale
+            if (comando_imput.remote_path == NULL || comando_imput.local_path == NULL) {
+                printf("Error: for download, both remote file and local file must be specified.\n");
+                exit(EXIT_FAILURE);
+            }
+            printf("Downloading...\n");
+
+            // invii la dimensione del il path del file desiderato
+            int pathlen = strlen(comando_imput.remote_path) + 1;
+            printf("dimensione: %d \n", pathlen);
+            if (send_message(socket,&pathlen, sizeof(pathlen)) <= 0) {
+                perror("Errore durante l'invio del comando");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+            // invii il path 
+            printf("path : %s\n",comando_imput.remote_path);
+            if (send_message(socket,comando_imput.remote_path, pathlen) <= 0) {
+                perror("Errore durante l'invio del comando");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+            //Aggiornamento del path
+            char fixed_path[1024];
+            fix_path(comando_imput.local_path, fixed_path);
+            comando_imput.local_path = strdup(fixed_path); // Aggiorna il valore con il path corretto
+
+            //controllo esistenza del file
+            create_file(comando_imput.local_path);
+            // riceve riceve il file richiesto dal server (send_file)
+            printf("ricezione del file...\n");
+            receive_file(comando_imput.local_path,socket);
+            printf("ricezione del file completata.\n");
+            printf("chiusura comando_imput.\n");
+           
+            close(socket);
+
+
+            break;
+
+        case 'l':
+            // Listing: elenca i file nel percorso remoto
+            if (comando_imput.remote_path == NULL) {
+                printf("Error: for listing, remote path must be specified.\n");
+                exit(EXIT_FAILURE);
+            }
+            printf("Listing files in remote path %s on server %s:%d\n", comando_imput.remote_path, connessione.server_address, connessione.port);
+            // Logica per il listing (es. connessione al server e recupero elenco file)
+
+            //invio dimensione del path
+            int path_len = strlen(comando_imput.remote_path) + 1;
+            printf("dimensione: %d \n", path_len);
+            if (send_message(socket,&path_len, sizeof(path_len)) <= 0) {
+                perror("Errore durante l'invio della dimensione");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+            // invii il path 
+            printf("path : %s\n",comando_imput.remote_path);
+            if (send_message(socket,comando_imput.remote_path, path_len) <= 0) {
+                perror("Errore durante l'invio del path");
+                close(socket);
+                exit(EXIT_FAILURE);
+            }
+            //ricezione del listing e print di esso
+            int resultLen;
+            receive_message(socket, &resultLen, sizeof(resultLen));
+            printf("%d\n", resultLen);
+            char *result = (char *) malloc(resultLen);
+            receive_message(socket, result, resultLen);
+            printf("cartella: %s\ncontenuto: %s\n", comando_imput.remote_path,result);
+            break;
+
+        default:
+            printf("Error: invalid command. Use -w for upload, -r for download, or -l for listing.\n");
+            exit(EXIT_FAILURE);
+    }
+
+}
