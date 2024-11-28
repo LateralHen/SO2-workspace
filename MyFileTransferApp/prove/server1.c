@@ -1,12 +1,13 @@
+#include <arpa/inet.h>
+#include <ctype.h>
+#include <dirent.h>
+#include <errno.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <getopt.h>
-#include <arpa/inet.h>
-#include <ctype.h>
 #include <sys/stat.h>
-#include <errno.h>
+#include <unistd.h>
 #include "server1.h"
 
 
@@ -48,8 +49,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    
     // Creazione del socket
-    if (server_fd = socket(AF_INET, SOCK_STREAM, 0) < 0) {
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
         perror("Errore nella creazione del socket");
         exit(1);
     }
@@ -58,6 +61,8 @@ int main(int argc, char *argv[]) {
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(server_port);
     server_addr.sin_addr.s_addr = inet_addr(server_address);
+
+
 
     // Binding
     if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
@@ -139,20 +144,50 @@ ssize_t receive_message(int socket, void *buffer, size_t length) {
 
 void send_file(const char *path, int socket) {
     char buffer[BUFFER_SIZE];
+    size_t bytes_read;
+    
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
-        perror("Errore nell'aprire il file");
-        return;
+        fprintf(stderr, "Errore nell'aprire il file %s: %s\n", path, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
+        ssize_t bytes_sent = send(socket, buffer, bytes_read, 0);
+        
+        // Controlla se l'invio ha avuto successo
+        if (bytes_sent < 0) {
+            perror("Errore durante l'invio dei dati");
+            fclose(file);
+            return;
+        }
+
+        // Verifica che siano stati inviati tutti i byte letti
+        if (bytes_sent < bytes_read) {
+            fprintf(stderr, "Non tutti i byte sono stati inviati al socket\n");
+            fclose(file);
+            return;
+        }
+    }
+    
+    
+
+    //test
+ /*    char pathtest[] = "serverDir/prova_read.txt";
+
+    FILE *file = fopen(pathtest, "rb");
+    if (file == NULL) {
+        fprintf(stderr, "Errore nell'aprire il file %s: %s\n", pathtest, strerror(errno));
     }
 
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
         if (send(socket, buffer, bytes_read, 0) < 0) {
-            perror("Errore durante l'invio dei dati");
+            fprintf(stderr, "Errore nell'aprire il file %s: %s\n", pathtest, strerror(errno));
             fclose(file);
             return;
         }
-    }
+    } */
 
     fclose(file);
 }
@@ -180,6 +215,7 @@ void receive_file(const char *path, int socket) {
 // Gestione delle connessioni
 
 void processing(int socket) {
+
     char command;
     if (receive_message(socket, &command, sizeof(char)) < 0){
         perror("Errore durante l'invio del comando");
@@ -193,20 +229,20 @@ void processing(int socket) {
         close(socket);
         return;
     }
+    printf("pathlen: %d\n", pathlen);
 
-
-    char *full_path = (char *)malloc(pathlen);
-    if (receive_message(socket, full_path, pathlen) < 0)
+    char *path = (char *)malloc(pathlen);
+    if (receive_message(socket, path, pathlen) < 0)
     {
         perror("Errore durante la ricezione del path");
-        free(full_path);
+        free(path);
         close(socket);
         return;
     }
+    char *full_path = (char *)malloc(256 * sizeof(char));
+
+    fix_path(path, full_path);
     
-    fix_path(full_path, "clientDir");// TODO: aggingere ricezione della root del client
-    char filename[256], pathfile[1024];
-    split_path(full_path, pathfile, filename);
 
     switch (command) {
         case 'w':
@@ -219,6 +255,15 @@ void processing(int socket) {
             break;
         case 'l':
             printf("***FUNZIONE DI LISTING***\n");
+            printf("path: %s\n", full_path);
+
+
+            char *output;
+            output = listing_directory(full_path);
+            int output_len = strlen(output);
+            send_message(socket, &output_len, sizeof(output_len));
+            printf("%s \n dimensione: %d\n", output, output_len);
+            send_message(socket, output, output_len);
             break;
         default:
             fprintf(stderr, "Comando non riconosciuto\n");
@@ -247,14 +292,85 @@ void create_file(char *full_path) {
     fclose(file);
 }
 
-void fix_path(char *full_path, const char *clientDir) {
-    if (strncmp(full_path, clientDir, strlen(clientDir)) == 0) {
-        memmove(full_path, full_path + strlen(clientDir) + 1, strlen(full_path) - strlen(clientDir));
+void fix_path(char *path, char *full_path) {
+
+/*     // Aggiungi serverDir all'inizio del percorso
+    int new_len = strlen(root_dir) + strlen(full_path) + 2;  // +2 per la barra e il terminatore di stringa
+    char temp_path[new_len];
+
+    // Costruisci il nuovo percorso
+    snprintf(temp_path, sizeof(temp_path), "%s/%s", root_dir, full_path);
+
+    // Copia il nuovo percorso in full_path
+    strcpy(full_path, temp_path); */
+
+    size_t len_root = strlen(root_dir);
+    size_t len_path = strlen(path);
+    full_path = realloc(full_path,(len_path + len_root + 2));
+    snprintf(full_path, len_path + len_root + 2, "%s/%s", root_dir, path);
+
+
+
+}
+
+
+
+char *listing_directory(char *path){
+    // path = "serverDir/prova_di_listing";
+    struct dirent *entry;  // Per leggere ogni elemento della directory
+    DIR *dir = opendir(path);  // Apre la directory
+    
+    printf("\nPATH: %s\n\n",path);
+    if (dir == NULL) {
+        perror("Errore nell'aprire la directory");
+        return NULL;
     }
 
-    if (strncmp(full_path, root_dir, strlen(root_dir)) != 0) {
-        char temp_path[1024];
-        snprintf(temp_path, sizeof(temp_path), "%s/%s", root_dir, full_path);
-        strcpy(full_path, temp_path);
+    // Verifica se il path è effettivamente una directory
+    struct stat path_stat;
+    if (stat(path, &path_stat) != 0 || !S_ISDIR(path_stat.st_mode)) {
+        perror("Il percorso fornito non è una directory");
+        closedir(dir);
+        return NULL;
     }
+
+    int size_output = 256;
+    char *output = malloc(size_output);
+    if (output == NULL){
+        perror("Errore nell'allocazione della memoria");
+        closedir(dir);
+        return NULL;
+    }
+    
+    output[0] = '\0';
+    int size_temp = 0;
+
+    while ((entry = readdir(dir)) != NULL){
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0){
+           
+            int len_filename = strlen(entry->d_name);
+            //aumento di memoria per output nel caso non fosse sufficiente
+            if (size_temp + len_filename + 2 >= size_output){ // +2 per il separatore e per il terminatore
+                
+                size_output *= 2;
+                output = realloc(output, size_output);
+
+                if (output == NULL){
+                    perror("Errore nel ridimensionamento della memoria");
+                    closedir(dir);
+                    return NULL;
+                }
+            }
+
+            if (size_temp > 0) {
+                strcat(output, ", ");
+                size_temp += 2;
+            }
+            strcat(output, entry -> d_name);
+            size_temp += len_filename;
+        }
+    }
+
+    closedir(dir);
+    return output;
 }

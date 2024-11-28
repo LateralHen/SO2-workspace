@@ -9,7 +9,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <getopt.h>
-#include "client1.h"
+#include "client2.h"
 
 int main(int argc, char *argv[])
 {
@@ -142,8 +142,7 @@ int main(int argc, char *argv[])
             // invia dimensione path
             int pathlen = strlen(daticonn.remote_path) + 1;
             printf("dimensione: %d \n", pathlen);
-            if (send_message(client_fd,&pathlen, sizeof(pathlen))<= 0)
-            {
+            if (send(client_fd,&pathlen, sizeof(pathlen), 0) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -151,7 +150,7 @@ int main(int argc, char *argv[])
 
             // invia il path 
             printf("path : %s\n",daticonn.remote_path);
-            if (send_message (client_fd,daticonn.remote_path, pathlen) <= 0) {
+            if (send(client_fd,daticonn.remote_path, pathlen, 0) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -166,7 +165,7 @@ int main(int argc, char *argv[])
             //dimensione path
             int pathlen = strlen(daticonn.local_path) + 1;
             printf("dimensione: %d \n", pathlen);
-            if (send_message(client_fd,&pathlen, sizeof(pathlen)) <= 0) {
+            if (send(client_fd,&pathlen, sizeof(pathlen), 0) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -176,7 +175,7 @@ int main(int argc, char *argv[])
             //daticonn.local_path = server/prova.txt
 
             printf("path : %s\n",daticonn.local_path);
-            if (send_message(client_fd,daticonn.local_path, pathlen) <= 0) {
+            if (send(client_fd,daticonn.local_path, pathlen, 0) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -200,14 +199,14 @@ int main(int argc, char *argv[])
             // invii la dimensione del il path del file desiderato
             int pathlen = strlen(daticonn.remote_path) + 1;
             printf("dimensione: %d \n", pathlen);
-            if (send_message(client_fd,&pathlen, sizeof(pathlen)) <= 0) {
+            if (send(client_fd,&pathlen, sizeof(pathlen), 0) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
             }
             // invii il path 
             printf("path : %s\n",daticonn.remote_path);
-            if (send_message(client_fd,daticonn.remote_path, pathlen) <= 0) {
+            if (send(client_fd,daticonn.remote_path, pathlen, 0) <= 0) {
                 perror("Errore durante l'invio del comando");
                 close(client_fd);
                 exit(EXIT_FAILURE);
@@ -238,29 +237,10 @@ int main(int argc, char *argv[])
             }
             printf("Listing files in remote path %s on server %s:%d\n", daticonn.remote_path, daticonn.server_address, daticonn.port);
             // Logica per il listing (es. connessione al server e recupero elenco file)
+            // creare connessione
+            // inviare messaggio che avvisa che il client ha il comando "listing"
+            // riceve il listing del path che ha inviato sottoforma di stringa
 
-            //invio dimensione del path
-            int path_len = strlen(daticonn.remote_path) + 1;
-            printf("dimensione: %d \n", path_len);
-            if (send_message(client_fd,&path_len, sizeof(path_len)) <= 0) {
-                perror("Errore durante l'invio della dimensione");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            // invii il path 
-            printf("path : %s\n",daticonn.remote_path);
-            if (send_message(client_fd,daticonn.remote_path, path_len) <= 0) {
-                perror("Errore durante l'invio del path");
-                close(client_fd);
-                exit(EXIT_FAILURE);
-            }
-            //ricezione del listing e print di esso
-            int resultLen;
-            receive_message(client_fd, &resultLen, sizeof(resultLen));
-            printf("%d\n", resultLen);
-            char *result = (char *) malloc(resultLen);
-            receive_message(client_fd, result, resultLen);
-            printf("cartella: %s\ncontenuto: %s\n", daticonn.remote_path,result);
             break;
 
         default:
@@ -272,105 +252,69 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int send_message(int socket, const void *message, size_t length) {
-    ssize_t bytes_sent = 0;
-    while (bytes_sent < length) {
-        ssize_t result = send(socket, (char*)message + bytes_sent, length - bytes_sent, 0);
-        if (result < 0) {
-            perror("Errore durante l'invio del messaggio");
-            return -1;  // Errore durante l'invio
-        }
-        bytes_sent += result;
-    }
-    return bytes_sent;  // Ritorna il numero totale di byte inviati
-}
-
-ssize_t receive_message(int socket, void *buffer, size_t length) {
-    ssize_t bytes_received = 0;
-    while (bytes_received < length) {
-        ssize_t result = recv(socket, (char*)buffer + bytes_received, length - bytes_received, 0);
-        if (result < 0) {
-            perror("Errore durante la ricezione del messaggio");
-            return -1;  // Errore durante la ricezione
-        }
-        if (result == 0) {
-            printf("Connessione chiusa dal client\n");
-            return 0;  // Connessione chiusa
-        }
-        bytes_received += result;
-    }
-    return bytes_received;  // Ritorna il numero totale di byte ricevuti
-}
 
 void send_file(const char *path, int socket) {
     char buffer[BUFFER_SIZE];
+    size_t bytes_read;
+
+    // Apre il file in modalità lettura binaria
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
         perror("Errore nell'aprire il file");
         return;
     }
 
-    size_t bytes_read;
+    // Legge dal file e invia al socket
     while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
-        if (send(socket, buffer, bytes_read, 0) < 0) {
+        ssize_t bytes_sent = send(socket, buffer, bytes_read, 0);
+        
+        // Controlla se l'invio ha avuto successo
+        if (bytes_sent < 0) {
             perror("Errore durante l'invio dei dati");
+            fclose(file);
+            return;
+        }
+
+        // Verifica che siano stati inviati tutti i byte letti
+        if (bytes_sent < bytes_read) {
+            fprintf(stderr, "Non tutti i byte sono stati inviati al socket\n");
             fclose(file);
             return;
         }
     }
 
+    // Chiude il file dopo aver inviato tutti i dati
     fclose(file);
 }
 
 void receive_file(const char *path, int socket) {
     char buffer[BUFFER_SIZE];
+    ssize_t bytes_received;
+
+    // Apre il file in modalità scrittura binaria
     FILE *file = fopen(path, "wb");
     if (file == NULL) {
         perror("Errore nell'aprire il file");
         return;
     }
 
-    ssize_t bytes_received;
+    // Riceve dal socket e scrive nel file
     while ((bytes_received = recv(socket, buffer, BUFFER_SIZE, 0)) > 0) {
-        fwrite(buffer, 1, bytes_received, file);
+        size_t bytes_written = fwrite(buffer, 1, bytes_received, file);
+        if (bytes_written < bytes_received) {
+            perror("Errore durante la scrittura del file");
+            fclose(file);
+            return;
+        }
     }
 
+    // Verifica se c'è stato un errore nella ricezione
     if (bytes_received < 0) {
         perror("Errore durante la ricezione dei dati");
     }
 
+    // Chiude il file dopo aver ricevuto tutti i dati
     fclose(file);
-}
-
-void split_path(const char *full_path, char *path, char *filename){
-
-    // Trova l'ultimo separatore di directory
-    const char *last_slash = strrchr(full_path, '/');
-    
-    if (last_slash != NULL) {
-        // Calcola la lunghezza del path
-        size_t path_length = last_slash - full_path + 1;
-
-        // Copia il path nella variabile
-        strncpy(path, full_path, path_length);
-        path[path_length] = '\0'; // Aggiungi il terminatore
-
-        // Copia il filename
-        strcpy(filename, last_slash + 1);
-    } else {
-        // Se non c'è il separatore, non c'è un path
-        strcpy(path, ""); // Path vuoto
-        strcpy(filename, full_path); // Il filename è l'intera stringa
-    }
-}
-
-void fix_path(const char *input_path, char *output_path) {
-    // Verifica se il path inizia con base_dir
-    if (strncmp(input_path, base_dir, strlen(base_dir)) == 0) {
-        snprintf(output_path, 1024, "%s", input_path);
-    } else {
-        snprintf(output_path, 1024, "%s/%s", base_dir, input_path);
-    }
 }
 
 void create_file(char *full_path){
@@ -446,4 +390,36 @@ void create_file(char *full_path){
     printf("File creato con successo: %s\n", full_client_path);
     fclose(file);
 }
+
+void split_path(const char *full_path, char *path, char *filename){
+
+    // Trova l'ultimo separatore di directory
+    const char *last_slash = strrchr(full_path, '/');
+    
+    if (last_slash != NULL) {
+        // Calcola la lunghezza del path
+        size_t path_length = last_slash - full_path + 1;
+
+        // Copia il path nella variabile
+        strncpy(path, full_path, path_length);
+        path[path_length] = '\0'; // Aggiungi il terminatore
+
+        // Copia il filename
+        strcpy(filename, last_slash + 1);
+    } else {
+        // Se non c'è il separatore, non c'è un path
+        strcpy(path, ""); // Path vuoto
+        strcpy(filename, full_path); // Il filename è l'intera stringa
+    }
+}
+
+void fix_path(const char *input_path, char *output_path) {
+    // Verifica se il path inizia con base_dir
+    if (strncmp(input_path, base_dir, strlen(base_dir)) == 0) {
+        snprintf(output_path, 1024, "%s", input_path);
+    } else {
+        snprintf(output_path, 1024, "%s/%s", base_dir, input_path);
+    }
+}
+
 

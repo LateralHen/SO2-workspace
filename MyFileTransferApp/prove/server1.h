@@ -1,8 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
 
 #define BUFFER_SIZE 1024
 #define MAX_CONNECTION 5
@@ -92,7 +87,7 @@ void make_root(char *dir);
  * @param full_path Percorso da modificare.
  * @param clientDir directory del client da rimuovere.
  */
-void fix_path(char *full_path, const char *clientDir);
+void fix_path(char *path, char *full_path);
 
 /**
  * Riceve un messaggio dal client e lo salva nel buffer.
@@ -123,3 +118,22 @@ ssize_t receive_message(int socket, void *buffer, size_t length);
  * @return Numero di byte inviati, o -1 in caso di errore.
  */
 int send_message(int socket, const void *message, size_t length);
+
+/**
+ * Cerca la directory del path e effettua un listing di essa (nel caso esista).
+ * 
+ * @param path Il percorso della directory da analizzare.
+ *             Deve essere un percorso valido e accessibile.
+ * 
+ * @return Un puntatore a una stringa allocata dinamicamente contenente i nomi
+ *         degli elementi nella directory, separati da virgole. 
+ *         Se si verifica un errore (ad esempio directory non accessibile o 
+ *         errore di allocazione della memoria), la funzione restituisce `NULL`.
+ * 
+ * @note La stringa restituita deve essere liberata manualmente dal chiamante
+ *       utilizzando `free` per evitare perdite di memoria.
+ * 
+ * @warning La funzione non gestisce directory molto grandi in maniera ottimale.
+ *          Potrebbe essere necessario aumentare il buffer dinamicamente più volte.
+ */
+char *listing_directory(char *path);
