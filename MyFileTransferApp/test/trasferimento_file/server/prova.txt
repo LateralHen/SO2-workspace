@@ -1,2 +1,0 @@
-Questo è un file di prova.
-Trasferiremo questo file al client.

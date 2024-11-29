@@ -1,1 +1,0 @@
-prova di lettura del server da parte del client
