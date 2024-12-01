@@ -1,21 +1,32 @@
-#include <arpa/inet.h>
-#include <ctype.h>
-#include <dirent.h>
-#include <errno.h>
-#include <getopt.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include "server1.h"
+
+
+#define THREAD_POOL_SIZE 5
+
+// Variabili globali
+int server_fd;
+pthread_t thread_pool[THREAD_POOL_SIZE];
+pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
+
+int client_queue[MAX_CONNECTION];
+//indici della coda di attesa dei thread
+int queue_front = 0, queue_rear = 0, queue_size = 0;
+
+// Funzioni x pool thread
+void *thread_worker(void *arg);
+void enqueue_client(int client_socket);
+int dequeue_client();
+
 
 
 // Funzione principale
 int main(int argc, char *argv[]) {
+
     int opt;
     struct sockaddr_in server_addr, client_addr;
-    int server_fd, client_fd;
+    int server_fd;
+    socklen_t addr_len = sizeof(client_addr);
 
     while ((opt = getopt(argc, argv, "a:p:d:")) != -1) {
         switch (opt) {
@@ -50,7 +61,7 @@ int main(int argc, char *argv[]) {
     }
 
     
-    // Creazione del socket
+    // Creazione del socket del server
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
         perror("Errore nella creazione del socket");
@@ -78,19 +89,28 @@ int main(int argc, char *argv[]) {
 
     printf("Server in ascolto su %s:%d\n", server_address, server_port);
 
+    /* 
+    Creazione del thread pool.
+    Ad ogni thread viene associata la funzione thread_worker.
+    */
+
+    for (int i = 0; i < THREAD_POOL_SIZE; i++) {
+        if (pthread_create(&thread_pool[i], NULL, thread_worker, NULL) != 0) {
+            perror("Errore nella creazione del thread");
+            exit(1);
+        }
+    }
+
     // Ciclo di accettazione connessioni
     while (1) {
-        socklen_t addr_len = sizeof(client_addr);
-        client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
-        if (client_fd == -1) {
+        int client_socket = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+        if (client_socket == -1) {
             perror("Errore nell'accettare la connessione");
             continue;
         }
         printf("Connessione accettata da %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        processing(client_fd);
-        printf("Chiusura della connessione con il client...\n");
-        close(client_fd);
+        enqueue_client(client_socket);
     }
 
     return 0;
@@ -199,7 +219,7 @@ void receive_file(const char *path, int socket) {
 // Gestione delle connessioni
 
 void processing(int socket) {
-
+    
     char command;
     if (receive_message(socket, &command, sizeof(char)) < 0){
         perror("Errore durante l'invio del comando");
@@ -358,3 +378,72 @@ char *listing_directory(char *path){
     closedir(dir);
     return output;
 }
+
+
+void *thread_processing(void *arg){}// l'ho aggiunta io questa funzione.
+
+
+/* lavora in un loop infinito. preleva il primo client dalla coda d'attesa-> lavora come prima.   */
+void *thread_worker(void *arg){
+    //loop infinito
+    while (1) {
+        int client_socket = dequeue_client();
+        printf("Thread %lu sta processando il client %d\n", pthread_self(), client_socket); // lu = insigned long integer
+
+        // Esegui la gestione del client
+        char buffer[1024];
+        ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        if (bytes_received > 0) {
+            buffer[bytes_received] = '\0';
+            printf("Messaggio ricevuto dal client %d: %s\n", client_socket, buffer);
+
+            // Rispondi al client
+            send(client_socket, "Ricevuto\n", 9, 0);
+        }
+
+        // Chiudi il socket del client
+        close(client_socket);
+        printf("Connessione chiusa con il client %d\n", client_socket);
+    }
+    return NULL;
+}
+
+/* serve per mettere in coda d'attesa i client in più. */
+void enqueue_client(int client_socket){
+    // acquisizione del mutex
+    pthread_mutex_lock(&queue_lock);
+    //Attesa nella coda
+    while (queue_size == MAX_CONNECTION) {
+        pthread_cond_wait(&queue_cond, &queue_lock);
+    }
+
+    // inserisci il socket nella coda
+    client_queue[queue_rear] = client_socket;
+    queue_rear = (queue_rear + 1) % MAX_CONNECTION;
+    queue_size++;
+
+    pthread_cond_signal(&queue_cond); // Notifica ai thread
+    pthread_mutex_unlock(&queue_lock);
+
+}
+
+/* prelava il primo client dalla coda di attesa  */
+int dequeue_client(){
+    //acquisizione del mutex
+    pthread_mutex_lock(&queue_lock);
+
+    while (queue_size == 0) {
+        pthread_cond_wait(&queue_cond, &queue_lock); // Aspetta che ci siano client
+    }
+
+    int client_socket = client_queue[queue_front];
+    queue_front = (queue_front + 1) % MAX_CONNECTION;
+    queue_size--;
+
+    pthread_cond_signal(&queue_cond); // Notifica che c'è spazio libero
+    pthread_mutex_unlock(&queue_lock);
+
+    return client_socket;
+}
+
+
