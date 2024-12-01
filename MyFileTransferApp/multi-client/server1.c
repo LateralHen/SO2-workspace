@@ -3,7 +3,7 @@
 
 #define THREAD_POOL_SIZE 5
 
-// Variabili globali
+// Variabili globali x pool di thread
 int server_fd;
 pthread_t thread_pool[THREAD_POOL_SIZE];
 pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -18,6 +18,26 @@ void *thread_worker(void *arg);
 void enqueue_client(int client_socket);
 int dequeue_client();
 
+// gestione delle risorse
+
+// strutture dati
+
+typedef struct ResourceMutex
+{
+    char *resource_name; // nome della risorsa
+    pthread_mutex_t mutex; // mutex associato
+    struct ResourceMutex *next; //puntatore al prossimo elemento
+}ResourceMutex;
+
+// funzioni x la gestione delle risorse
+pthread_mutex_t* create_resource_mutex(const char *resource);
+pthread_mutex_t* get_resource_mutex(const char *resource);
+void destroy_resource_mutex(const char *resource);
+
+// variabili globali per la gestione delle risorse
+
+//puntatore al primo elemento della lista dei mutex delle risorse
+ResourceMutex *resource_mutex_list = NULL;
 
 
 // Funzione principale
@@ -444,6 +464,66 @@ int dequeue_client(){
     pthread_mutex_unlock(&queue_lock);
 
     return client_socket;
+}
+
+
+// gestione dei mutex per le risorse
+
+// Funzione per creare un nuovo mutex per una risorsa se non esiste
+pthread_mutex_t* create_resource_mutex(const char *resource){
+    
+    // verifica se esiste già il mutex per questa risorsa
+    if (get_resource_mutex(resource) != NULL)
+    {
+        return NULL;
+    }
+
+    // Altrimenti, crea un nuovo nodo e mutex per la risorsa
+    ResourceMutex *new_node = (ResourceMutex *)malloc(sizeof(ResourceMutex));
+    new_node->resource_name = strdup(resource);
+    pthread_mutex_init(&new_node->mutex,NULL);
+    new_node->next = resource_mutex_list;
+    resource_mutex_list = new_node;
+
+    return &new_node->mutex;
+}
+
+//funzione per trovare il mutex associato alla risorsa 
+pthread_mutex_t* get_resource_mutex(const char *resource){
+
+    ResourceMutex *current = resource_mutex_list;
+    while (current != NULL)
+    {
+        if (strcmp(current->resource_name, resource)== 0){
+            return &current->mutex;
+        }
+        current = current->next;        
+    }
+    return NULL;
+}
+
+
+void destroy_resource_mutex(const char *resource){
+    ResourceMutex *current = resource_mutex_list;
+    ResourceMutex *previous = NULL;
+
+    while (current != NULL) {
+        if (strcmp(current->resource_name, resource) == 0) {
+            // Trova il nodo con la risorsa
+            pthread_mutex_destroy(&current->mutex);
+            free(current->resource_name);
+
+            if (previous == NULL) {
+                resource_mutex_list = current->next;  // Rimuovi il nodo dalla lista
+            } else {
+                previous->next = current->next;
+            }
+            free(current);
+            return;
+        }
+        previous = current;
+        current = current->next;
+    }
 }
 
 
