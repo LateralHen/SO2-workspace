@@ -1,44 +1,6 @@
 #include "server1.h"
 
 
-#define THREAD_POOL_SIZE 5
-
-// Variabili globali x pool di thread
-int server_fd;
-pthread_t thread_pool[THREAD_POOL_SIZE];
-pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
-
-int client_queue[MAX_CONNECTION];
-//indici della coda di attesa dei thread
-int queue_front = 0, queue_rear = 0, queue_size = 0;
-
-// Funzioni x pool thread
-void *thread_worker(void *arg);
-void enqueue_client(int client_socket);
-int dequeue_client();
-
-// gestione delle risorse
-
-// strutture dati
-
-typedef struct ResourceMutex
-{
-    char *resource_name; // nome della risorsa
-    pthread_mutex_t mutex; // mutex associato
-    struct ResourceMutex *next; //puntatore al prossimo elemento
-}ResourceMutex;
-
-// funzioni x la gestione delle risorse
-pthread_mutex_t* create_resource_mutex(const char *resource);
-pthread_mutex_t* get_resource_mutex(const char *resource);
-void destroy_resource_mutex(const char *resource);
-
-// variabili globali per la gestione delle risorse
-
-//puntatore al primo elemento della lista dei mutex delle risorse
-ResourceMutex *resource_mutex_list = NULL;
-
 
 // Funzione principale
 int main(int argc, char *argv[]) {
@@ -240,6 +202,7 @@ void receive_file(const char *path, int socket) {
 
 void processing(int socket) {
     
+    // ricezione del comando
     char command;
     if (receive_message(socket, &command, sizeof(char)) < 0){
         perror("Errore durante l'invio del comando");
@@ -247,6 +210,7 @@ void processing(int socket) {
         return;
     }
 
+    // ricezione lunghezza del percorso
     int pathlen;
     if (receive_message(socket, &pathlen, sizeof(pathlen)) < 0){
         perror("Errore durante la ricezione della dimensione del path");
@@ -255,6 +219,7 @@ void processing(int socket) {
     }
     printf("pathlen: %d\n", pathlen);
 
+    // ricezione del percorso del file
     char *path = (char *)malloc(pathlen);
     if (receive_message(socket, path, pathlen) < 0)
     {
@@ -265,30 +230,51 @@ void processing(int socket) {
     }
     char *full_path = (char *)malloc(256 * sizeof(char));
 
+    // adattamento del percorso
     fix_path(path, full_path);
     printf("path: %s\n ", full_path);
+    pthread_mutex_t *resource_mutex = create_resource_mutex(full_path);
 
+    
     switch (command) {
         case 'w':
             printf("***FUNZIONE DI WRITE***\n");
-            receive_file(full_path, socket);
+            if (resource_mutex != NULL) {
+                pthread_mutex_lock(resource_mutex);  // Blocca il mutex per questa risorsa
+                printf("Accessing resource: %s\n", full_path);
+                receive_file(full_path, socket);
+                pthread_mutex_unlock(resource_mutex);  // Sblocca il mutex dopo l'accesso
+            }
+
             break;
         case 'r':
             printf("***FUNZIONE DI READ***\n");
-            send_file(full_path, socket);
+            if (resource_mutex != NULL) {
+                pthread_mutex_lock(resource_mutex);  // Blocca il mutex per questa risorsa
+                printf("Accessing resource: %s\n", full_path);
+                send_file(full_path, socket);
+                pthread_mutex_unlock(resource_mutex);  // Sblocca il mutex dopo l'accesso
+            }
             break;
         case 'l':
             printf("***FUNZIONE DI LISTING***\n");
-            printf("path: %s\n", full_path);
+            
+            if (resource_mutex != NULL) {
+                pthread_mutex_lock(resource_mutex);  // Blocca il mutex per questa risorsa
+                printf("Accessing resource: %s\n", full_path);
 
+                char *output;
+                output = listing_directory(full_path);
+                int output_len = strlen(output);
+                send_message(socket, &output_len, sizeof(output_len));
+                printf("%s \n dimensione: %d\n", output, output_len);
+                send_message(socket, output, output_len);
 
-            char *output;
-            output = listing_directory(full_path);
-            int output_len = strlen(output);
-            send_message(socket, &output_len, sizeof(output_len));
-            printf("%s \n dimensione: %d\n", output, output_len);
-            send_message(socket, output, output_len);
+                pthread_mutex_unlock(resource_mutex);  // Sblocca il mutex dopo l'accesso
+            }
+            
             break;
+
         default:
             fprintf(stderr, "Comando non riconosciuto\n");
             break;
@@ -336,8 +322,6 @@ void fix_path(char *path, char *full_path) {
 
 
 }
-
-
 
 char *listing_directory(char *path){
     // path = "serverDir/prova_di_listing";
@@ -400,8 +384,6 @@ char *listing_directory(char *path){
 }
 
 
-void *thread_processing(void *arg){}// l'ho aggiunta io questa funzione.
-
 
 /* lavora in un loop infinito. preleva il primo client dalla coda d'attesa-> lavora come prima.   */
 void *thread_worker(void *arg){
@@ -411,18 +393,9 @@ void *thread_worker(void *arg){
         printf("Thread %lu sta processando il client %d\n", pthread_self(), client_socket); // lu = insigned long integer
 
         // Esegui la gestione del client
-        char buffer[1024];
-        ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
-        if (bytes_received > 0) {
-            buffer[bytes_received] = '\0';
-            printf("Messaggio ricevuto dal client %d: %s\n", client_socket, buffer);
-
-            // Rispondi al client
-            send(client_socket, "Ricevuto\n", 9, 0);
-        }
+        processing(client_socket);
 
         // Chiudi il socket del client
-        close(client_socket);
         printf("Connessione chiusa con il client %d\n", client_socket);
     }
     return NULL;
@@ -502,7 +475,7 @@ pthread_mutex_t* get_resource_mutex(const char *resource){
     return NULL;
 }
 
-
+//funzione per distuggere il mutex
 void destroy_resource_mutex(const char *resource){
     ResourceMutex *current = resource_mutex_list;
     ResourceMutex *previous = NULL;

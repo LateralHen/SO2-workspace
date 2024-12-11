@@ -425,20 +425,14 @@ void processing(int socket){
             fix_path(comando_imput.local_path, &fixed_path, 1);
             printf("path generato: %s\n",fixed_path);
 
-
-
             //controllo esistenza del file
             create_file(fixed_path);
             
             // riceve riceve il file richiesto dal server (send_file)
-
-
             receive_file(fixed_path,socket);
             printf("chiusura Downloading.\n");
            
             close(socket);
-
-
             break;
 
         case 'l':

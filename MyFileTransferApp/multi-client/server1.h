@@ -12,10 +12,50 @@
 
 #define BUFFER_SIZE 1024
 #define MAX_CONNECTION 5
+#define THREAD_POOL_SIZE 5
 
+
+//variabili globali per la connessione lato server
 char *server_address = NULL;
 int server_port = 0;
 char *root_dir = NULL;
+
+
+
+// Variabili globali per pool di thread
+pthread_t thread_pool[THREAD_POOL_SIZE];
+pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
+
+int client_queue[MAX_CONNECTION];
+//indici della coda di attesa dei thread
+int queue_front = 0, queue_rear = 0, queue_size = 0;
+
+// gestione delle risorse
+
+// strutture dati
+
+typedef struct ResourceMutex
+{
+    char *resource_name; // nome della risorsa
+    pthread_mutex_t mutex; // mutex associato
+    struct ResourceMutex *next; //puntatore al prossimo elemento
+}ResourceMutex;
+
+// funzioni x la gestione delle risorse
+pthread_mutex_t* create_resource_mutex(const char *resource);
+pthread_mutex_t* get_resource_mutex(const char *resource);
+void destroy_resource_mutex(const char *resource);
+
+// variabili globali per la gestione delle risorse
+
+//puntatore al primo elemento della lista dei mutex delle risorse
+ResourceMutex *resource_mutex_list = NULL;
+
+
+
+
+
 
 /**
  * Riceve un file dal client e lo salva sul server.
@@ -59,7 +99,11 @@ void processing(int socket);
  * parti: la parte del percorso senza il nome del file (`path`) e il nome del 
  * file stesso (`filename`).
  * 
- * @param full_path Percorso completo del file.
+ * @p// Funzioni x pool thread
+
+void *thread_worker(void *arg);
+void enqueue_client(int client_socket);
+int dequeue_client();aram full_path Percorso completo del file.
  * @param path Output: parte del percorso senza il filename.
  * @param filename Output: solo il nome del file.
  */
@@ -148,3 +192,12 @@ int send_message(int socket, const void *message, size_t length);
  *          Potrebbe essere necessario aumentare il buffer dinamicamente più volte.
  */
 char *listing_directory(char *path);
+
+
+// Funzioni x pool thread
+
+void *thread_worker(void *arg);
+
+void enqueue_client(int client_socket);
+
+int dequeue_client();
