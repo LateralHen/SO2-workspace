@@ -303,23 +303,11 @@ void create_file(char *full_path) {
 }
 
 void fix_path(char *path, char *full_path) {
-
-/*     // Aggiungi serverDir all'inizio del percorso
-    int new_len = strlen(root_dir) + strlen(full_path) + 2;  // +2 per la barra e il terminatore di stringa
-    char temp_path[new_len];
-
-    // Costruisci il nuovo percorso
-    snprintf(temp_path, sizeof(temp_path), "%s/%s", root_dir, full_path);
-
-    // Copia il nuovo percorso in full_path
-    strcpy(full_path, temp_path); */
-
+    
     size_t len_root = strlen(root_dir);
     size_t len_path = strlen(path);
     full_path = realloc(full_path,(len_path + len_root + 2));
     snprintf(full_path, len_path + len_root + 2, "%s/%s", root_dir, path);
-
-
 
 }
 
