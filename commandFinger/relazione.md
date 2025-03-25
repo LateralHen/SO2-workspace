@@ -20,11 +20,7 @@ L’obiettivo principale è stato sviluppare un programma in linguaggio C che em
 
 Il codice è suddiviso in più funzioni per modularità e leggibilità. Di seguito è riportata una panoramica delle principali sezioni.  
 
-### 3.1 File header `Myfinger.h`
-
-Il file include le dichiarazioni necessarie per garantire la modularità del codice. Contiene prototipi delle funzioni utilizzate, dichiarazioni di variabili globali e costanti.  
-
-### 3.2 Funzioni principali  
+### 3.1 Funzioni principali  
 
 - **`main`**:  
   - Analizza gli argomenti della riga di comando, identificando opzioni (`-l`, `-s`, `-m`, `-p`) e nomi utente specifici.  
@@ -64,5 +60,3 @@ Il file include le dichiarazioni necessarie per garantire la modularità del cod
   Le strutture `passwd` e `utmp` sono state utilizzate per ottenere informazioni sugli utenti locali.  
 - **Formattazione e visualizzazione**:  
   I dati sono stati presentati in un formato leggibile, simile al comando `finger`, con un’attenzione particolare alla compatibilità con le opzioni specificate dall’utente.
-
-## 5. Conclusioni

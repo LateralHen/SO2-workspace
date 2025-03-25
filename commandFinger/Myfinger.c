@@ -40,11 +40,6 @@ int main(int argc, char  *argv[])
                
 
     }
-    
-    
-    // free(option);
-    
-
     return 0;
     }
 
@@ -420,10 +415,8 @@ void userSelection(char ***names, int *totalnames) {
 
 void gecos_format(char *gecos, char **words){
     
-
     char *token;
     int i = 0;
-
     // Ottieni il primo token
     token = strtok(gecos, ",");
 
@@ -433,7 +426,5 @@ void gecos_format(char *gecos, char **words){
         i ++;
         token = strtok(NULL, ","); // Ottieni il token successivo
     }
-    
-
     return;
 }
