@@ -20,6 +20,7 @@ int server_port = 0;
 char *root_dir = NULL;
 
 // Variabili globali per pool di thread
+pthread_mutex_t resource_list_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_t thread_pool[THREAD_POOL_SIZE];
 pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t queue_cond = PTHREAD_COND_INITIALIZER;
@@ -73,14 +74,7 @@ void send_file(const char *path, int socket);
  */
 void processing(int socket);
 
-/**
- * Divide un percorso completo in path e filename.
- * 
- * @param full_path Percorso completo del file.
- * @param path Parte del percorso senza il nome del file.
- * @param filename Nome del file.
- */
-void split_path(const char *full_path, char *path, char *filename);
+
 
 /**
  * Crea un file vuoto nel percorso specificato, se il file non esiste già.
@@ -100,9 +94,11 @@ void make_root(char *dir);
  * Modifica un percorso per adattarlo alla struttura serverDir.
  * 
  * @param path Percorso da modificare.
- * @param full_path Percorso completo.
+ * @return Percorso modificato.
+
  */
-void fix_path(char *path, char *full_path);
+char * fix_path(char *path);
+
 
 /**
  * Riceve un messaggio dal client e lo salva nel buffer.

@@ -23,7 +23,8 @@ int main(int argc, char  *argv[])
             {
                 // Allocazione della memoria per il nome
                 names = (char **)realloc(names, (totalNames + 1) * sizeof(char *));
-                names[totalNames] = argv[i];
+                names[totalNames] = strdup(argv[i]);
+
                 totalNames ++ ; 
             }
             
@@ -40,6 +41,12 @@ int main(int argc, char  *argv[])
                
 
     }
+    for (int i = 0; i < totalNames; i++) {
+        free(names[i]);
+    }
+    free(names);
+
+
     return 0;
     }
 
@@ -75,18 +82,40 @@ void printS(char **nameUser, int totalNames){
                     printf("%s \t", ut -> ut_user );
                     
                     //Real Name
-
                     char **words = NULL;
                     words = (char **)malloc(10 * sizeof(char *));
                     gecos_format(pwd->pw_gecos, words);
 
                     printf("%s\t", words[0]);
 
+                    for (int w = 0; w < 10 && words[w] != NULL; w++) {
+                        free(words[w]);
+                    }
+                    free(words);
+                    
+
                     // Terminal
                     printf("%s\t", ut ->ut_line);
 
                     // Idle Time
-                    printf(" \t");
+                    char tty_path[64];
+                    struct stat tty_stat;
+
+                    sprintf(tty_path, "/dev/%s", ut->ut_line);
+                    if (stat(tty_path, &tty_stat) == 0) {
+                        time_t now = time(NULL);
+                        int idle = now - tty_stat.st_atime;
+
+                        if (idle < 60)
+                            printf("0 min\t");
+                        else if (idle < 3600)
+                            printf("%d min\t", idle / 60);
+                        else
+                            printf("%d:%02d\t", idle / 3600, (idle % 3600) / 60);
+                    } else {
+                        printf("n/a\t");
+                    }
+
 
                     // Login time
 
@@ -157,6 +186,11 @@ void printL(char **nameUser, int totalNames){
             //home
             printf("Home Phone: %s\n", words[3]);
 
+            for (int w = 0; w < 10 && words[w] != NULL; w++) {
+                free(words[w]);
+            }
+            free(words);            
+
             // Directory
             printf("Directory: %s\t" , pwd -> pw_dir);
             
@@ -190,9 +224,7 @@ void printL(char **nameUser, int totalNames){
                 }
                 
             }
-            endutent();
-            /* ***INIZIO DEL SEGMENTATION FAULT*** */
-            
+            endutent();            
             
             //Mail
             char mailPath[256];
@@ -209,10 +241,6 @@ void printL(char **nameUser, int totalNames){
             }
             
             
-            //optP
-            //TRUE: è stato specificato il comando-> non devi stampare le info;
-            //FALSE: non è stato specificato il comando-> devi stampare le info.
-            
             if (!optP)
             {
                 //plan
@@ -221,22 +249,32 @@ void printL(char **nameUser, int totalNames){
 
                 FILE *planFile = fopen(planPath, "r");
                 if (planFile) {
-                    printf("Il file esiste e è stato aperto.\n");
-                    // Qui puoi leggere o lavorare con il file
+                    printf("Plan:\n");
+                    char buffer[256];
+                    while (fgets(buffer, sizeof(buffer), planFile)) {
+                        printf("%s", buffer);
+                    }
                     fclose(planFile);
                 } else {
                     printf("No Plan.\n");
                 }
+                
                 //project
                 char projectPath[256];
                 sprintf(projectPath, "%s/.project",pwd-> pw_dir);
 
                 FILE *projectFile = fopen(projectPath, "r");
                 if (projectFile) {
-                    printf("Il file esiste e è stato aperto.\n");
-                    // Qui puoi leggere o lavorare con il file
+                    printf("Project:\n");
+                    char buffer[256];
+                    while (fgets(buffer, sizeof(buffer), projectFile)) {
+                        printf("%s", buffer);
+                    }
                     fclose(projectFile);
+                } else {
+                    printf("No P.\n");
                 }
+                
                     
                 //pgpkey
                 char pgpkeyPath[256];
@@ -244,9 +282,14 @@ void printL(char **nameUser, int totalNames){
 
                 FILE *pgpkeyFile = fopen(pgpkeyPath, "r");
                 if (pgpkeyFile) {
-                    printf("Il file esiste e è stato aperto.\n");
-                    // Qui puoi leggere o lavorare con il file
+                    printf("PGP key:\n");
+                    char buffer[256];
+                    while (fgets(buffer, sizeof(buffer), pgpkeyFile)) {
+                        printf("%s", buffer);
+                    }
                     fclose(pgpkeyFile);
+                } else {
+                    printf("No PGP key.\n");
                 }
             }
             
@@ -340,7 +383,7 @@ void userSelection(char ***names, int *totalnames) {
                 strncpy(utente, ut->ut_user, sizeof(utente) - 1);
                 utente[sizeof(utente) - 1] = '\0';
 
-                for (int j = 0; j < i; i++)
+                for (int j = 0; j < i; j++)
                 {
                     if (strcmp(utente,*names[j]) == 0)
                     {

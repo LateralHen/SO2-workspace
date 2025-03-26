@@ -7,6 +7,10 @@
 #include <pwd.h>
 #include <time.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 
 #define SEIMESI 15552000 /**< Definisce il numero di secondi in sei mesi. */
 

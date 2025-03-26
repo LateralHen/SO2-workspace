@@ -100,18 +100,7 @@ int main(int argc, char *argv[]) {
 
 // Implementazione delle funzioni correlate ai file
 
-void split_path(const char *full_path, char *path, char *filename) {
-    const char *last_slash = strrchr(full_path, '/');
-    if (last_slash != NULL) {
-        size_t path_length = last_slash - full_path + 1;
-        strncpy(path, full_path, path_length);
-        path[path_length] = '\0';
-        strcpy(filename, last_slash + 1);
-    } else {
-        strcpy(path, "");
-        strcpy(filename, full_path);
-    }
-}
+
 
 int send_message(int socket, const void *message, size_t length) {
     ssize_t bytes_sent = 0;
@@ -228,10 +217,15 @@ void processing(int socket) {
         close(socket);
         return;
     }
-    char *full_path = (char *)malloc(256 * sizeof(char));
 
     // adattamento del percorso
-    fix_path(path, full_path);
+
+    char * full_path = fix_path(path);
+    if (!full_path){
+        free (path);
+        close(socket);
+        return;
+    } 
     printf("path: %s\n ", full_path);
     pthread_mutex_t *resource_mutex = create_resource_mutex(full_path);
 
@@ -269,8 +263,8 @@ void processing(int socket) {
                 send_message(socket, &output_len, sizeof(output_len));
                 printf("%s \n dimensione: %d\n", output, output_len);
                 send_message(socket, output, output_len);
-
                 pthread_mutex_unlock(resource_mutex);  // Sblocca il mutex dopo l'accesso
+                free(output);
             }
             
             break;
@@ -302,13 +296,18 @@ void create_file(char *full_path) {
     fclose(file);
 }
 
-void fix_path(char *path, char *full_path) {
+char * fix_path(char *path) {
     
     size_t len_root = strlen(root_dir);
     size_t len_path = strlen(path);
-    full_path = realloc(full_path,(len_path + len_root + 2));
+    char *full_path = malloc(len_path + len_root + 2);
+    
+    if(!full_path){
+        perror("Errore nell'allocazione della memoria");
+        return NULL;
+    }
     snprintf(full_path, len_path + len_root + 2, "%s/%s", root_dir, path);
-
+    return full_path;
 }
 
 char *listing_directory(char *path){
@@ -432,10 +431,11 @@ int dequeue_client(){
 
 // Funzione per creare un nuovo mutex per una risorsa se non esiste
 pthread_mutex_t* create_resource_mutex(const char *resource){
-    
+    pthread_mutex_lock(&resource_list_lock);
     // verifica se esiste già il mutex per questa risorsa
     if (get_resource_mutex(resource) != NULL)
     {
+        pthread_mutex_unlock(&resource_list_lock);
         return NULL;
     }
 
@@ -445,26 +445,29 @@ pthread_mutex_t* create_resource_mutex(const char *resource){
     pthread_mutex_init(&new_node->mutex,NULL);
     new_node->next = resource_mutex_list;
     resource_mutex_list = new_node;
-
+    pthread_mutex_unlock(&resource_list_lock);
     return &new_node->mutex;
 }
 
 //funzione per trovare il mutex associato alla risorsa 
 pthread_mutex_t* get_resource_mutex(const char *resource){
-
+    pthread_mutex_lock(&resource_list_lock);
     ResourceMutex *current = resource_mutex_list;
     while (current != NULL)
     {
         if (strcmp(current->resource_name, resource)== 0){
+            pthread_mutex_unlock(&resource_list_lock);
             return &current->mutex;
         }
         current = current->next;        
     }
+    pthread_mutex_unlock(&resource_list_lock);
     return NULL;
 }
 
 //funzione per distuggere il mutex
 void destroy_resource_mutex(const char *resource){
+    pthread_mutex_lock(&resource_list_lock);
     ResourceMutex *current = resource_mutex_list;
     ResourceMutex *previous = NULL;
 
@@ -485,6 +488,5 @@ void destroy_resource_mutex(const char *resource){
         previous = current;
         current = current->next;
     }
+    pthread_mutex_unlock(&resource_list_lock);
 }
-
-
